@@ -4,10 +4,19 @@ version = "0.1.0"
 authors = ["Simon Sapin <simon.sapin@exyr.org>", "James Munns <james.munns@gmail.com>"]
 
 [dependencies]
-teensy3 = "0.1"
+teensy3 = { path = "teensy3-rs_otaku/teensy3", features = ["teensy_3_6"]}
 
 [profile.dev]
 panic = "abort"
 
 [profile.release]
 panic = "abort"
+opt-level = "s"
+lto = "thin"
+
+[features]  # Choose one
+#teensy_3_0 = ["teensy3/teensy_3_0"]
+#teensy_3_1 = ["teensy3/teensy_3_1"]
+#teensy_3_2 = ["teensy3/teensy_3_2"]
+#teensy_3_5 = ["teensy3/teensy_3_5"]
+teensy_3_6 = ["teensy3/teensy_3_6"]

@@ -1,18 +1,20 @@
 [build]
 target = "thumbv7em-none-eabi"
-
 [target.thumbv7em-none-eabi]
 rustflags = [
+    "-C", "linker=arm-none-eabi-gcc",
     "-C", "link-arg=-mcpu=cortex-m4",
     "-C", "link-arg=-mthumb",
-    "-C", "link-arg=-Tmk20dx256.ld",
+    "-C", "link-arg=-Tlinker_script.ld",
     "-C", "link-arg=-Os",
-    "-C", "link-arg=-Wl,--gc-sections,--defsym=__rtc_localtime=0",
+#    "-C", "link-arg=-Wl,--gc-sections,--defsym=__rtc_localtime=0",
+    # nano is memory-optimized newlib, 50KB flash becomes 30KB
     "-C", "link-arg=--specs=nano.specs",
-    "-C", "link-arg=-lm",
+#    "-C", "link-arg=-lm",
     "-C", "link-arg=-Wl,--start-group",
     "-C", "link-arg=-lnosys",
-    "-C", "link-arg=-lc",
     "-C", "link-arg=-lgcc",
     "-C", "link-arg=-Wl,--end-group",
+    # This must be last argument or else there's duplicate symbols
+    "-C", "link-arg=-lc",
 ]
