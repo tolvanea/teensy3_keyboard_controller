@@ -1,28 +1,39 @@
+# Choose your model below by uncommenting the corresponding line.
+#MODEL=TEENSY30
+#MODEL=TEENSY31
+#MODEL=TEENSY32
+#MODEL=TEENSY35
+MODEL=TEENSY36
+
+# Following definition makes hopefully more understandable error message when
+# model is not specified.
+ifndef MODEL
+    MODEL=PLEASE_SPECIFY_YOUR_TEENSY_MODEL_IN_MAKEFILE
+endif
+
+
 BIN=teensy3-rs-demo
 OUTDIR=target/thumbv7em-none-eabi/release
-HEX=$(OUTDIR)/$(BIN).hex
-ELF=$(OUTDIR)/$(BIN)
-# The CPU type is written to temporal file by build.rs
-MCU=$(<$(OUTDIR)/mcu_info.txt)
+HEXPATH=$(OUTDIR)/$(BIN).hex
+BINPATH=$(OUTDIR)/$(BIN)
 
+all:: $(BINPATH)
 
-all:: $(ELF)
+.PHONY: $(BINPATH)
+$(BINPATH):
+	cross build --release --target thumbv7em-none-eabi --features "$(MODEL)"
 
-.PHONY: $(ELF)
-$(ELF):
-	cross build --target thumbv7em-none-eabi --release
-	#cargo build --release
+.PHONY: debug
+debug:
+	cross build --debug --target thumbv7em-none-eabi --features "$(MODEL)"
 
-$(HEX): $(ELF)
-	arm-none-eabi-objcopy -O ihex $(ELF) $(HEX)
+$(HEXPATH): $(BINPATH)
+	arm-none-eabi-objcopy -O ihex -R .eeprom $(BINPATH) $(HEXPATH)
 
-# TODO FIGURE OUT TO GET MCU FROM UGLY OUT PATH
-#.PHONY: flash
-#flash: $(HEX)
-#	teensy_loader_cli -w -mmcu=$(MCU) $(HEX) -v
+.PHONY: flash
+flash: $(HEXPATH)
+	teensy_loader_cli -w -s --mcu=$(MODEL) $(HEXPATH) -v
 
-# arm-none-eabi-objcopy -O ihex target/thumbv7em-none-eabi/release/teensy3-rs-demo target/thumbv7em-none-eabi/release/teensy3-rs-demo.hex
-# teensy_loader_cli -w -mmcu=TEENSY36 target/thumbv7em-none-eabi/release/teensy3-rs-demo.hex -v
-
-# arm-none-eabi-objcopy -O ihex -R .eeprom target/thumbv7em-none-eabi/release/teensy3-rs-demo target/thumbv7em-none-eabi/release/teensy3-rs-demo.hex
-# teensy_loader_cli -w -s --mcu=TEENSY36 target/thumbv7em-none-eabi/release/teensy3-rs-demo.hex
+.PHONY: clean
+clean:
+	cross clean
