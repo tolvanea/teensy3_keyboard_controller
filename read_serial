@@ -1,0 +1,20 @@
+#! /bin/bash
+# Reads serial output from arduino or teensy
+
+while [ true ]
+do
+    if [ -e "/dev/ttyACM0" ]; then
+        echo "---------- Serial port found ----------"
+
+        stty -F /dev/ttyACM0 raw
+        stty -F /dev/ttyACM0 -echo
+        while read -N 1 c
+        do
+            printf "$c"
+        done < /dev/ttyACM0
+        echo "---------- Serial port lost ----------"
+    else
+        sleep 1s
+    fi
+done
+
