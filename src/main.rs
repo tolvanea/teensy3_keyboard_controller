@@ -13,34 +13,45 @@ pub unsafe extern fn main() {
 
     bindings::pinMode(13, bindings::OUTPUT as u8);
     bindings::digitalWrite(13, bindings::LOW as u8);
-    let mut ser = Serial{};
+    let ser = Serial{};
+    let mut i = 0;
 
     loop {
+        // Send a message over the USB Serial port
+        let msg = "Hello !\n";
+        // If the serial write fails, we will halt (no more alive blinks)
+        match ser.write_bytes(msg.as_bytes()) {
+            Ok(s) => (),
+            Err(e) => {println!("Write unsuccesfull!");},
+        }
+        println!("Count: {}", i);
+        i += 1;
         // Show we are alive
         alive();
 
-        // If the serial write fails, we will halt (no more alive blinks)
-        hello(&ser).unwrap();
+        if i > 2 {
+            panic!("Test panic");
+        }
 
         // Don't spam the console
-        bindings::delay(1000);
+        bindings::delay(2000);
     }
 }
 
 /// Blink the light twice to know we're alive
 pub unsafe fn alive() {
-    for _ in 0..2 {
-        bindings::digitalWrite(13, bindings::LOW as u8);
-        bindings::delay(200);
+    for _ in 0..3 {
         bindings::digitalWrite(13, bindings::HIGH as u8);
-        bindings::delay(200);
+        bindings::delay(100);
         bindings::digitalWrite(13, bindings::LOW as u8);
-        bindings::delay(200);
+        bindings::delay(100);
+    }
+    for _ in 0..2 {
+        bindings::digitalWrite(13, bindings::HIGH as u8);
+        bindings::delay(500);
+        bindings::digitalWrite(13, bindings::LOW as u8);
+        bindings::delay(500);
     }
 }
 
-/// Send a message over the USB Serial port
-pub fn hello(ser: &Serial) -> Result<(),()> {
-    let msg = "Hello Teensy Rusty World!\n\r";
-    ser.write_bytes(msg.as_bytes())
-}
+

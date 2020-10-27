@@ -8,8 +8,7 @@ rustflags = [
     "-C", "link-arg=-Tlinker_script.ld",
     "-C", "link-arg=-Os",
 #    "-C", "link-arg=-Wl,--gc-sections,--defsym=__rtc_localtime=0",
-    # nano is memory-optimized newlib, 50KB flash becomes 30KB
-    "-C", "link-arg=--specs=nano.specs",
+    "-C", "link-arg=--specs=nano.specs",  # nano is memory-optimized newlib
 #    "-C", "link-arg=-lm",
     "-C", "link-arg=-Wl,--start-group",
     "-C", "link-arg=-lnosys",

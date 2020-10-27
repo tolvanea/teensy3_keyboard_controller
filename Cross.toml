@@ -1,0 +1,4 @@
+[target.thumbv7em-none-eabi]
+# You can change this to whatever name want.
+# This name is shown when listing docker images with command "docker images"
+image = "teensy3/cross:tag"
