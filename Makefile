@@ -25,7 +25,11 @@ $(BINPATH):
 
 .PHONY: debug
 debug:
-	cross build --debug --target thumbv7em-none-eabi --features "$(MODEL)"
+	cross build --target thumbv7em-none-eabi --features "$(MODEL)" --verbose
+
+.PHONY: doc
+doc:
+	cross doc --features TEENSY36 --target "thumbv7em-none-eabi"
 
 $(HEXPATH): $(BINPATH)
 	arm-none-eabi-objcopy -O ihex -R .eeprom $(BINPATH) $(HEXPATH)

@@ -7,6 +7,8 @@ extern crate teensy3;
 use teensy3::bindings;
 use teensy3::serial::Serial;
 
+use core::convert::TryInto;
+
 #[no_mangle]
 pub unsafe extern fn main() {
     // Blink Loop
@@ -52,6 +54,14 @@ pub unsafe fn alive() {
         bindings::digitalWrite(13, bindings::LOW as u8);
         bindings::delay(500);
     }
+    bindings::Keyboard.press(bindings::KEY_H.try_into().unwrap());
+    bindings::Keyboard.release(bindings::KEY_H.try_into().unwrap());
+    bindings::Keyboard.press(bindings::KEY_E.try_into().unwrap());
+    bindings::Keyboard.release(bindings::KEY_E.try_into().unwrap());
+    bindings::Keyboard.press(bindings::KEY_I.try_into().unwrap());
+    bindings::Keyboard.release(bindings::KEY_I.try_into().unwrap());
+    bindings::Keyboard.press(bindings::KEY_SPACE.try_into().unwrap());
+    bindings::Keyboard.release(bindings::KEY_SPACE.try_into().unwrap());
 }
 
 

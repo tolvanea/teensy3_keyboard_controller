@@ -2,3 +2,7 @@
 # You can change this to whatever name want.
 # This name is shown when listing docker images with command "docker images"
 image = "teensy3/cross:tag"
+
+# I don't know how target can be given to cross other than command line argument
+#[build]
+#target = "thumbv7em-none-eabi"
