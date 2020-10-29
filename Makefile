@@ -1,9 +1,14 @@
+# Important!
 # Choose your model below by uncommenting the corresponding line.
 #MODEL=TEENSY30
 #MODEL=TEENSY31
 #MODEL=TEENSY32
 #MODEL=TEENSY35
-MODEL=TEENSY36
+#MODEL=TEENSY36
+
+# --------------------------------------------
+# Rest of makefile that need not to be touched
+# --------------------------------------------
 
 # Following definition makes hopefully more understandable error message when
 # model is not specified.
@@ -12,11 +17,13 @@ ifndef MODEL
 endif
 
 TARGET=thumbv7em-none-eabi
-# Enable hard floating point with for teensy 3.5 and 3.6 by uncommenting following line.
-# However, it is not yet working. If you want to fight linker errors, then go ahead.
-# I bet the problem is in old versions of newlib that ubuntu 16.04 uses
-TARGET=thumbv7em-none-eabihf
-
+# Enable hard floating point with for teensy 3.5 and 3.6
+ifeq ($(MODEL), TEENSY35)
+    TARGET=thumbv7em-none-eabihf
+endif
+ifeq ($(MODEL), TEENSY36)
+    TARGET=thumbv7em-none-eabihf
+endif
 
 BIN=teensy3-rs-demo
 OUTDIR=target/$(TARGET)/release
