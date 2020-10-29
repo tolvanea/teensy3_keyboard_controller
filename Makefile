@@ -11,9 +11,15 @@ ifndef MODEL
     MODEL=PLEASE_SPECIFY_YOUR_TEENSY_MODEL_IN_MAKEFILE
 endif
 
+TARGET=thumbv7em-none-eabi
+# Enable hard floating point with for teensy 3.5 and 3.6 by uncommenting following line.
+# However, it is not yet working. If you want to fight linker errors, then go ahead.
+# I bet the problem is in old versions of newlib that ubuntu 16.04 uses
+TARGET=thumbv7em-none-eabihf
+
 
 BIN=teensy3-rs-demo
-OUTDIR=target/thumbv7em-none-eabi/release
+OUTDIR=target/$(TARGET)/release
 HEXPATH=$(OUTDIR)/$(BIN).hex
 BINPATH=$(OUTDIR)/$(BIN)
 
@@ -21,15 +27,15 @@ all:: $(BINPATH)
 
 .PHONY: $(BINPATH)
 $(BINPATH):
-	cross build --release --target thumbv7em-none-eabi --features "$(MODEL)"
+	cross build --release --target $(TARGET) --features "$(MODEL)"
 
 .PHONY: debug
 debug:
-	cross build --target thumbv7em-none-eabi --features "$(MODEL)" --verbose
+	cross build --target $(TARGET) --features "$(MODEL)" --verbose
 
 .PHONY: doc
 doc:
-	cross doc --features TEENSY36 --target "thumbv7em-none-eabi"
+	cross doc --features TEENSY36 --target "$(TARGET)"
 
 $(HEXPATH): $(BINPATH)
 	arm-none-eabi-objcopy -O ihex -R .eeprom $(BINPATH) $(HEXPATH)

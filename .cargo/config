@@ -1,10 +1,35 @@
-[build]
-target = "thumbv7em-none-eabi"
 [target.thumbv7em-none-eabi]
+# Default rust-lld does not work with c FFI
+linker = "arm-none-eabi-gcc"
 rustflags = [
-    # Default rust-lld does not work with c FFI
-    "-C", "linker=arm-none-eabi-gcc",
     "-C", "link-arg=-mcpu=cortex-m4",
+    "-C", "link-arg=-mthumb",
+    # offical teensy3 linker script selected by build.rs
+    "-C", "link-arg=-Tlinker_script.ld",
+    # Optimize for size
+    "-C", "link-arg=-Os",
+    # link-time garbage collection
+    "-C", "link-arg=-Wl,--gc-sections,--defsym=__rtc_localtime=0",
+    # nano is memory-optimized newlib
+    "-C", "link-arg=--specs=nano.specs",
+#    "-C", "link-arg=-lm",
+    "-C", "link-arg=-Wl,--start-group",
+    "-C", "link-arg=-lnosys",
+    "-C", "link-arg=-lgcc",
+    "-C", "link-arg=-Wl,--end-group",
+    # This must be last argument or else there's duplicate symbols
+    "-C", "link-arg=-lc",
+]
+
+# Exact copy from above for hard floating points version
+[target.thumbv7em-none-eabihf]
+# Default rust-lld does not work with c FFI
+linker = "arm-none-eabi-gcc"
+rustflags = [
+    "-C", "link-arg=-mcpu=cortex-m4",
+    "-C", "link-arg=-flto",
+    "-C", "link-arg=-mfpu=fpv4-sp-d16",
+    "-C", "link-arg=-mfloat-abi=hard",
     "-C", "link-arg=-mthumb",
     # offical teensy3 linker script selected by build.rs
     "-C", "link-arg=-Tlinker_script.ld",

@@ -22,10 +22,7 @@ pub unsafe extern fn main() {
         // Send a message over the USB Serial port
         let msg = "Hello !\n";
         // If the serial write fails, we will halt (no more alive blinks)
-        match ser.write_bytes(msg.as_bytes()) {
-            Ok(s) => (),
-            Err(e) => {println!("Write unsuccesfull!");},
-        }
+        ser.write_bytes(msg.as_bytes()).unwrap_or_else(|_|{println!("Write unsuccesfull!");});
         println!("Count: {}", i);
         i += 1;
         // Show we are alive
@@ -54,14 +51,14 @@ pub unsafe fn alive() {
         bindings::digitalWrite(13, bindings::LOW as u8);
         bindings::delay(500);
     }
-    bindings::Keyboard.press(bindings::KEY_H.try_into().unwrap());
-    bindings::Keyboard.release(bindings::KEY_H.try_into().unwrap());
-    bindings::Keyboard.press(bindings::KEY_E.try_into().unwrap());
-    bindings::Keyboard.release(bindings::KEY_E.try_into().unwrap());
-    bindings::Keyboard.press(bindings::KEY_I.try_into().unwrap());
-    bindings::Keyboard.release(bindings::KEY_I.try_into().unwrap());
-    bindings::Keyboard.press(bindings::KEY_SPACE.try_into().unwrap());
-    bindings::Keyboard.release(bindings::KEY_SPACE.try_into().unwrap());
+    // bindings::Keyboard.press(bindings::KEY_H.try_into().unwrap());
+    // bindings::Keyboard.release(bindings::KEY_H.try_into().unwrap());
+    // bindings::Keyboard.press(bindings::KEY_E.try_into().unwrap());
+    // bindings::Keyboard.release(bindings::KEY_E.try_into().unwrap());
+    // bindings::Keyboard.press(bindings::KEY_I.try_into().unwrap());
+    // bindings::Keyboard.release(bindings::KEY_I.try_into().unwrap());
+    // bindings::Keyboard.press(bindings::KEY_SPACE.try_into().unwrap());
+    // bindings::Keyboard.release(bindings::KEY_SPACE.try_into().unwrap());
 }
 
 
