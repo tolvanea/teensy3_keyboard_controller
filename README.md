@@ -3,7 +3,7 @@
 This is an example project that uses bindings from [teensy3-rs](https://github.com/tolvanea/teensy3-rs) crate. This aims to be dead simple template to get teensy project running. It is intended to be forked, or copied into a new project.
 
 ## About in this fork
-This fork is based on James Munns' [https://github.com/jamesmunns/teensy3-rs-demo](https://github.com/tolvanea/teensy3-rs). Main modifications are:
+This fork is based on James Munns' [teensy3-rs-demo](https://github.com/jamesmunns/teensy3-rs-demo). Main modifications are:
 * Getting it to work on my machine
 * Change Cargo to Cross, and so do compilation is done in Docker container
 * Support for teensy 3.0-3.6
