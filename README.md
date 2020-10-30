@@ -14,9 +14,9 @@ This fork is based on James Munns' [teensy3-rs-demo](https://github.com/jamesmun
 This project uses [Cross](https://github.com/rust-embedded/cross) instead of Cargo, and compilation is done in Docker container. Docker container is useful in this situation, because binding generation and cross compilation is very sensitive to installed dependencies and libraries. Different version numbering of gcc may cause failing compilation, which docker solves.
 
 ## Installations
-Install [teensy-loader-cli](https://www.pjrc.com/teensy/loader_cli.html), which will be used to flash compiled binaries on teensy. Installation on ubuntu is:
+Install [teensy-loader-cli](https://www.pjrc.com/teensy/loader_cli.html), which will be used to flash compiled binaries on teensy. Also install objcopy-tool, which transforms binary to hex-file. Installation on ubuntu is:
 ```
-sudo apt-get install teensy-loader-cli
+sudo apt-get install teensy-loader-cli binutils-arm-none-eabi
 ```
 Install [Cross](https://github.com/rust-embedded/cross):
 ```
