@@ -5,20 +5,20 @@ This is an example project that uses bindings from [teensy3-rs](https://github.c
 ## About in this fork
 This fork is based on James Munns' [teensy3-rs-demo](https://github.com/jamesmunns/teensy3-rs-demo). Main modifications are:
 * Getting it to work on my machine
-* Change Cargo to Cross, and so do compilation is done in Docker container
+* Change Cargo to [Cross](https://github.com/rust-embedded/cross), and so compilation is done in Docker container
 * Support for teensy 3.0-3.6
-* Reduce need for device specific configuration: Teensy model is only needed to be set once in Makefile.
+* Reduce need for device specific configuration: Teensy model is only needed to be specified once in Makefile.
 * For other modification notes see [teensy3-rs](https://github.com/tolvanea/teensy3-rs)
 
 ## About this project
-This project uses [Cross](https://github.com/rust-embedded/cross) instead of cargo, which runs compilation in Docker container. Docker container is useful in this situation, because cross compilation is very sensitive to installed dependencies and their versions.
+This project uses [Cross](https://github.com/rust-embedded/cross) instead of Cargo, and compilation is done in Docker container. Docker container is useful in this situation, because binding generation and cross compilation is very sensitive to installed dependencies and libraries. Different version numbering of gcc may cause failing compilation, which docker solves.
 
 ## Installations
-Install [teensy-loader-cli](https://www.pjrc.com/teensy/loader_cli.html), which will be used to flash compiled binary on teensy. Installation on ubuntu is:
+Install [teensy-loader-cli](https://www.pjrc.com/teensy/loader_cli.html), which will be used to flash compiled binaries on teensy. Installation on ubuntu is:
 ```
 sudo apt-get install teensy-loader-cli
 ```
-Install [Cross](https://github.com/rust-embedded/cross)
+Install [Cross](https://github.com/rust-embedded/cross):
 ```
 cargo install cross
 ```
@@ -27,7 +27,7 @@ Install Docker. On ubuntu it can be done with:
 ```
 sudo apt-get install docker
 ```
-You can check that docker is running
+You can check that docker is running with:
 ```
 sudo systemctl status docker
 ```
@@ -35,7 +35,7 @@ Allow current user to use docker, so there is no need to write `sudo` with every
 ```
 sudo usermod -aG docker ${USER}
 ```
-However, above command takes effect after loggin out and in. To avoid relogging, it can be temporarily fixed with 
+However, the above command takes effect after loggin out and in. To avoid relogging, it can be temporarily fixed with 
 ```
 su - $USER                                           
 ```
@@ -73,19 +73,19 @@ Plug teensy in with usb cable and flash it
 make flash
 ```
 You may need to press button on board to finish the flash.
-And that's it! You should see fastly blinking led going on and of.
-Linux users can run following script to read output from teensy
+And that's it! You should see quickly blinking led going on and of.
+Linux users can read output from teensy by running following shell script:
 ```
 ./read_output_from_usb
 ``` 
 
 
 ## Other makefile usage
-Debug build with
+Debug build with:
 ```
 make debug
 ```
-Generate documentation for current project and bindings with
+Generate documentation for current project and bindings with:
 ```
 make doc
 ```
