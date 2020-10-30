@@ -2,15 +2,16 @@
 
 This is an example project that uses bindings from [teensy3-rs](https://github.com/tolvanea/teensy3-rs) crate. This aims to be dead simple template to get teensy project running. It is intended to be forked, or copied into a new project.
 
-## Modification in this fork
-* Get it working on my machine
+## About in this fork
+This fork is based on James Munns [https://github.com/jamesmunns/teensy3-rs-demo](https://github.com/tolvanea/teensy3-rs). Main modifications are:
+* Getting it to work on my machine
+* Change Cargo to Cross, and so do compilation is done in Docker container
 * Support for teensy 3.0-3.6
-* Change Cargo to Cross, and do compilation in isolated Docker container
-* Reduce need for configuration: The only needed thing is to set teensy model in makefile
-* For other notes see [teensy3-rs](https://github.com/tolvanea/teensy3-rs)
+* Reduce need for device specific configuration: Teensy model is only needed to be set once in Makefile.
+* For other modification notes see [teensy3-rs](https://github.com/tolvanea/teensy3-rs)
 
 ## About this project
-This project uses [Cross](https://github.com/rust-embedded/cross) instead of cargo, which runs compilation in Docker container. Docker container is useful, because cross compilation is sensitive to installed dependencies.
+This project uses [Cross](https://github.com/rust-embedded/cross) instead of cargo, which runs compilation in Docker container. Docker container is useful in this situation, because cross compilation is very sensitive to installed dependencies and their versions.
 
 ## Installations
 Install [teensy-loader-cli](https://www.pjrc.com/teensy/loader_cli.html), which will be used to flash compiled binary on teensy. Installation on ubuntu is:
