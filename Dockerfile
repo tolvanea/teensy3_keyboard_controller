@@ -1,19 +1,19 @@
 FROM rustembedded/cross:thumbv7em-none-eabi-0.2.1
-
-# For floating point support there is also following template, but I think it's the same
-#FROM rustembedded/cross:thumbv7em-none-eabihf-0.2.1
+# Above image is based on ubuntu 16.04
 
 RUN apt-get update
-# Some of these may be not needed, but I'm not going to test everything one by one
+# Some of the following dependencies may be not needed, but I'm too lazy to test
 RUN apt-get install --assume-yes --no-install-recommends \
-# Reinstall?
+# Following two dependencies are already installed in rustembedded image,
+# but they are written here again for clarity
     gcc-arm-none-eabi \
-# Reinstall?
     libnewlib-arm-none-eabi \
     libnewlib-dev \
     libstdc++-arm-none-eabi-newlib \
     clang \
     libclang-8-dev \
     gcc-multilib
-#    binutils-arm-none-eabi \
-#    libusb-dev \
+
+# For floating point support there is also following template:
+# FROM rustembedded/cross:thumbv7em-none-eabihf-0.2.1
+# but I think it has exactly the same dependencies as this one

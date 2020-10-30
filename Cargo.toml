@@ -15,7 +15,7 @@ opt-level = "s"
 lto = "thin"
 
 [features]
-# Choose one. This feature will passed with environmental variable from Makefile
+# One of following features will be enabled from Makefile. (Please configure your model in Makefile)
 TEENSY30 = ["teensy3/teensy_3_0"]
 TEENSY31 = ["teensy3/teensy_3_1"]
 TEENSY32 = ["teensy3/teensy_3_2"]

@@ -1,5 +1,6 @@
 # Important!
 # Choose your model below by uncommenting the corresponding line.
+# There is no need to do any other device specific modifications in the entire project.
 #MODEL=TEENSY30
 #MODEL=TEENSY31
 #MODEL=TEENSY32
