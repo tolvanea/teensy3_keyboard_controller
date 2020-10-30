@@ -1,0 +1,3 @@
+[submodule "teensy3-rs"]
+	path = teensy3-rs
+	url = git@github.com:tolvanea/teensy3-rs.git

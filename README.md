@@ -33,7 +33,7 @@ However, the above command takes effect only after logging out and in. To avoid 
 ```
 su - $USER                                           
 ```
-which gives `sudo` rights only for that one terminal window. This command resets current working directory, so there is need to navigate back to the teensy3-rs-demo directory.
+which fixes need to use `sudo` only for that one terminal window. This command resets current working directory, so there is need to navigate back to the teensy3-rs-demo directory.
 
 ## Setting up
 Clone this repository with command
@@ -51,8 +51,10 @@ This docker image will be used by cross. All available docker images on system c
 docker images
 ```
 
-Then, teensy model should be specified. Uncomment the line corresponding your teensy model in `Makefile`.
+Then, teensy model should be specified. Uncomment the line corresponding your teensy model in `Makefile`. For example:
 ```
+#MODEL=TEENSY32
+#MODEL=TEENSY35
 MODEL=TEENSY36
 ```
 No other device specific configuration is needed. Everything else is automated.
