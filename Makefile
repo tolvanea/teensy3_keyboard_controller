@@ -8,7 +8,7 @@
 #MODEL=TEENSY36
 
 # --------------------------------------------
-# Rest of makefile that need not to be touched
+# The rest of makefile need not to be touched
 # --------------------------------------------
 
 # Following definition makes hopefully more understandable error message when
