@@ -23,23 +23,17 @@ Install [Cross](https://github.com/rust-embedded/cross):
 cargo install cross
 ```
 
-Install Docker. On ubuntu it can be done with:
-```
-sudo apt-get install docker
-```
-You can check that docker is running with:
-```
-sudo systemctl status docker
-```
-Allow current user to use docker, so there is no need to write `sudo` with every docker command
+Install Docker. On ubuntu it can be done by following "Step 1" in [this link](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-20-04).
+
+By default docker usage requires super user rights. Allow current user to use docker, so Cross and Docker need not to be called with `sudo` every time:
 ```
 sudo usermod -aG docker ${USER}
 ```
-However, the above command takes effect after loggin out and in. To avoid relogging, it can be temporarily fixed with 
+However, the above command takes effect only after logging out and in. To avoid relogging, it can be temporarily fixed with 
 ```
 su - $USER                                           
 ```
-which works only in that terminal it is called.
+which gives `sudo` rights only for that one terminal window. This command resets current working directory, so there is need to navigate back to the teensy3-rs-demo directory.
 
 ## Setting up
 Clone this repository with command
