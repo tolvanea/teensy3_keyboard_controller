@@ -1,6 +1,6 @@
 # Teensy with Rust
 
-This is an example project that uses bindings from [teensy3-rs](https://github.com/tolvanea/teensy3-rs) crate. This aims to be dead simple template to get teensy project running. It is intended to be forked, or copied into a new project.
+This is an example project that uses bindings from [teensy3-rs](https://github.com/tolvanea/teensy3-rs) crate. This aims to be dead simple template to get teensy project running. It is intended to be forked or copied into a new project.
 
 ## About in this fork
 This fork is based on James Munns' [teensy3-rs-demo](https://github.com/jamesmunns/teensy3-rs-demo). Main modifications are:
@@ -8,6 +8,7 @@ This fork is based on James Munns' [teensy3-rs-demo](https://github.com/jamesmun
 * Change Cargo to [Cross](https://github.com/rust-embedded/cross), and so compilation is done in Docker container
 * Support for teensy 3.0-3.6
 * Reduce need for device specific configuration: Teensy model is only needed to be specified once in Makefile.
+* Place teensy3-rs crate in same directory as a sub module, so that library build process is easy to tweak
 * For other modification notes see [teensy3-rs](https://github.com/tolvanea/teensy3-rs)
 
 ## About this project
