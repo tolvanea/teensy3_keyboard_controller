@@ -7,6 +7,9 @@
 #MODEL=TEENSY35
 #MODEL=TEENSY36
 
+PKGMAN=cross
+#PKGMAN=cargo  # You can use cargo if you have installed all dependencies from Dockerfile
+
 # --------------------------------------------
 # The rest of makefile need not to be touched
 # --------------------------------------------
@@ -35,15 +38,15 @@ all:: $(BINPATH)
 
 .PHONY: $(BINPATH)
 $(BINPATH):
-	cross build --release --target $(TARGET) --features "$(MODEL)"
+	$(PKGMAN) build --release --target $(TARGET) --features "$(MODEL)"
 
 .PHONY: debug
 debug:
-	cross build --target $(TARGET) --features "$(MODEL)" --verbose
+	$(PKGMAN) build --target $(TARGET) --features "$(MODEL)" --verbose
 
 .PHONY: doc
 doc:
-	cross doc --features TEENSY36 --target "$(TARGET)"
+	$(PKGMAN) doc --features TEENSY36 --target "$(TARGET)"
 
 $(HEXPATH): $(BINPATH)
 	arm-none-eabi-objcopy -O ihex -R .eeprom $(BINPATH) $(HEXPATH)
@@ -54,4 +57,4 @@ flash: $(HEXPATH)
 
 .PHONY: clean
 clean:
-	cross clean
+	$(PKGMAN) clean
