@@ -17,7 +17,7 @@ This project uses [Cross](https://github.com/rust-embedded/cross) instead of Car
 However, optionally, Cargo can be also used, if dependencies found in `Dockerfile` are installed on system by using system's package manager. Makefile can be configured to use Cargo instead of Cross. 
 
 ## Installations
-Install [teensy-loader-cli](https://www.pjrc.com/teensy/loader_cli.html), which will be used to flash compiled binaries on teensy. Also install objcopy-tool, which transforms binary to hex-file. Installation on ubuntu is:
+Install [teensy-loader-cli](https://www.pjrc.com/teensy/loader_cli.html), which will be used to flash hex-files on teensy. Also install objcopy tool, which transforms compiled binary to hex-file. Installation on ubuntu is:
 ```
 sudo apt-get install teensy-loader-cli binutils-arm-none-eabi
 ```
