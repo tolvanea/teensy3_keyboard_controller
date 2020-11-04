@@ -2,9 +2,9 @@
 
 This project is based on template [teensy3-rs-demo](https://github.com/tolvanea/teensy3-rs-demo).
 
-The main aim here is to create usb keyboard by using teensy3 and laptop keyboard spare part. Used teensy model is 3.6, and laptop keyboard is from Lenovo ThinkPad T480. Laptop keyboard spare part is connected to teensy with flat cable. When keys are pressed, they short circuits different connections on flat cable, and teensy uses that information to send corresponding keys over USB port. 
+The main aim here is to create usb keyboard by using teensy3 and laptop keyboard spare part. Teensy is model 3.6, and laptop keyboard is from Lenovo ThinkPad T480. Keyboard is connected to teensy with flat cable. When keys are pressed, they connect different lanes on flat cable, and teensy uses that information to send corresponding keys over USB port. 
 
-This project has not been possible without following useful information sources:
+This project would not been possible without following useful information sources:
 * https://www.instructables.com/How-to-Make-a-USB-Laptop-Keyboard-Controller/
 * https://github.com/thedalles77/USB_Laptop_Keyboard_Controller  
 * https://github.com/jamesmunns/teensy3-rs-demo

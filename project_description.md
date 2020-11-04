@@ -1,5 +1,5 @@
-#Keyboard controller project description
-COMP.530-01 Bare Metal Rust 
+# Keyboard controller project description
+This file lists project criteria for course COMP.530-01 Bare Metal Rust. 
 
 1. **The general idea of the application.**
     * Make usb keyboard from laptop's keyboard part.
