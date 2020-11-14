@@ -6,12 +6,12 @@ extern crate teensy3;
 
 use teensy3::serial::Serial;
 use teensy3::util::{delay};
-use teensy3::pins::{PinMode, Pin, PinRowSingleton};
+use teensy3::pins::{PinMode, Pin, PinRow};
 use teensy3::bindings;
 
-fn setup() -> PinRowSingleton {
+fn setup() -> PinRow {
     // It's unsafe because caller verifies that it's called only once
-    unsafe{PinRowSingleton::new_once()}
+    unsafe{ PinRow::new_once()}
 }
 
 
