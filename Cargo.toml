@@ -5,7 +5,7 @@ edition = "2018"
 authors = ["Alpi Tolvanen <alpi.tolvanen@tutanota.com>", "Simon Sapin <simon.sapin@exyr.org>", "James Munns <james.munns@gmail.com>"]
 
 [dependencies]
-teensy3 = { path = "teensy3-rs/teensy3"}
+teensy3 = { path = "teensy3-rs/teensy3", features = ["usb_serial_hid"]}
 heapless = "0.5.6"
 typenum = "1.12.0"
 
