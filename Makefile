@@ -5,7 +5,7 @@
 #MODEL=TEENSY31
 #MODEL=TEENSY32
 #MODEL=TEENSY35
-MODEL=TEENSY36
+#MODEL=TEENSY36
 
 PKGMAN=cross
 #PKGMAN=cargo  # You can use cargo if you have installed all dependencies from Dockerfile
