@@ -294,20 +294,9 @@ pub extern fn main() {
             Some(code) => {
                 println!("Code: {}", code);
                 //unsafe{keyboard.set_key1(code as u8);}
-                if code != b::KEY_W {
-                    unsafe { keyboard.press(code as u16); }
-                    delay(100);
-                    unsafe { keyboard.release(code as u16); }
-                }
-                else {
-                    unsafe { keyboard.press(b::KEY_MINUS as u16); }
-                    unsafe { keyboard.press(b::MODIFIERKEY_SHIFT as u16); }
-                    unsafe { keyboard.press(b::KEY_COMMA as u16); }
-                    delay(100);
-                    unsafe { keyboard.release(b::KEY_COMMA as u16); }
-                    unsafe { keyboard.release(b::MODIFIERKEY_SHIFT as u16); }
-                    unsafe { keyboard.release(b::KEY_MINUS as u16); }
-                }
+                unsafe { keyboard.press(code as u16); }
+                delay(100);
+                unsafe { keyboard.release(code as u16); }
             },
             None => {
                 println!("No matrix item for this combination! {:?}", (i_idx, j_idx));
