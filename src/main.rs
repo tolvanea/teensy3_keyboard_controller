@@ -4,8 +4,8 @@
 #[macro_use]
 extern crate teensy3;
 
-use heapless::{Vec}; // fixed capacity `std::Vec`
-use typenum::{Unsigned, U16 as MatrixSize, U64 as MaxPins, U256 as MaxKeys};
+use heapless::{Vec, ArrayLength}; // fixed capacity `std::Vec`
+use typenum::{Unsigned, U16 as MatrixCap, U64 as PinsCap, U256 as KeysCap};  // Maximum capacities
 
 use teensy3::util::{delay};
 use teensy3::pins::{PinMode, Pin, PinRow, NUM_PINS, LED_PIN};
@@ -24,10 +24,10 @@ fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
     // Connected pins. There should be only ONE pin pair connected, but
     let mut connection: Option<(usize, usize)> = None;
 
-    assert!(NUM_PINS <= MaxPins::to_usize(), "Allocated memory ran out, too many pins");
+    assert!(NUM_PINS <= PinsCap::to_usize(), "Allocated memory ran out, too many pins");
     // Set all pins to drain mode, but by default disable them. They will be turned on
     // only to check whether some particular connection exists
-    let mut pins: Vec<Pin, MaxPins> = (0..NUM_PINS).filter(|&i| i != LED_PIN)
+    let mut pins: Vec<Pin, PinsCap> = (0..NUM_PINS).filter(|&i| i != LED_PIN)
         .map(|i| {
             let mut p = pinrow.get_pin(i, PinMode::OutputOpenDrain);
             p.digital_write(true);  // By default disable drain
@@ -75,6 +75,36 @@ fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
     return pair;
 }
 
+fn full_vec<T, U>(value: T, len: usize) -> Vec<T,U>
+where T: Clone, U: ArrayLength<T>
+{
+    let mut a = Vec::<T, U>::new();
+    a.resize(len, value).unwrap();
+    return a;
+}
+
+#[derive(Debug, Clone)]
+struct KeyMatrix {
+    code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>,
+    row_to_pin: Vec<usize, MatrixCap>,
+    col_to_pin: Vec<usize, MatrixCap>,
+    pin_to_row: Vec<Option<usize>, PinsCap>,
+    pin_to_col: Vec<Option<usize>, PinsCap>,
+}
+
+impl KeyMatrix {
+    /// Fetch the keycode corresponding connection of some pin indices. If there is no keycode
+    /// for that pair, panic.
+    fn get(&self, i: usize, j: usize) -> Option<u32> {
+        let (i, j) = if i < j {(i, j)} else {(j, i)};  // put in order
+        if i < self.pin_to_row.len() || j < self.pin_to_col.len() {
+            self.code_matrix[self.pin_to_row[i]?][self.pin_to_col[j]?]
+        } else {
+            None  // Out of bounds
+        }
+    }
+}
+
 /// Utility tool that finds out key matrix. User presses through every single key through in
 /// keyboard. Keys 'Enter' and 'Space' are used to fix typos or other problems in typing prosess.
 /// If typo is made, 'Enter' can be pressed and current row is restarted.
@@ -85,6 +115,7 @@ fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
 /// it can be copy-pasted to source code.
 /// # Arguments
 /// * `pinrow` :    PinRow singleton
+///
 /// * `key_codes` : This contains names of all key codes in same order that they will be pressed.
 ///                 The list is divided in parts, which makes key typing process easier, because key
 ///                 pressing can is divided to many parts. For example, these parts correspond
@@ -102,16 +133,19 @@ fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
 ///                 ```
 ///                 (Actually first keys need not to be enter and space, but whatever they are, they
 ///                 will be used as error handling keys described above.)
-/// * `key_names`:  Similar list to `key_codes`, but contains names of keys. These names are
-///                 printed for each key that will be typed. Also, key matrix is printed, so if
-///                 key names are literal strings of corresponding key codes, then that that matrix
-///                 can be directly copy-pasted to source code.
-
-fn figure_out_key_matrix<'a>(pinrow: &mut PinRow, key_codes: &[&[u32]], key_names: &[&[&'a str]])
-                             -> (Vec<Vec<Option<u32>, MatrixSize>, MatrixSize>, Vec<usize, MaxPins>, Vec<usize, MaxPins>)
+///
+/// * `key_names`:  Similar list to `key_codes`, but contains names of keys. These names
+///                 are printed for each key that will be typed. Also, key matrix is printed, so if
+///                 key names are literal strings corresponding CONSTS in source code, then that
+///                 that matrix can be directly copy-pasted to source code.
+fn figure_out_key_matrix<'a>(
+    pinrow: &mut PinRow,
+    key_codes: &[&[u32]],
+    key_names: &[&[&'a str]]
+) -> KeyMatrix
 {
-    assert!(key_names[0].len() == 2,
-            r#"First list in `key_codes` should contain only Enter and Space.\n\
+    assert!(key_codes[0].len() == 2,
+        r#"First list in `key_codes` should contain only Enter and Space.\n\
         The list may look something like the following:\n\
         `&[\
             &[KEY_ENTER, KEY_SPACE], \n\
@@ -120,11 +154,11 @@ fn figure_out_key_matrix<'a>(pinrow: &mut PinRow, key_codes: &[&[u32]], key_name
             &[KEY_TAB, KEY_Q, KEY_W, ...],\n\
             ...
          ]`"#);
-    let mut keys: Vec<(usize, usize, u32, &str), MaxKeys> = Vec::new();
+    let mut keys: Vec<(usize, usize, u32, &str), KeysCap> = Vec::new();
 
-    let key_codes_len = key_names.len();
+    let key_codes_len = key_codes.len();
     let mut key_codes_itr = key_codes.iter();
-    let mut key_names_itr = key_names.iter();
+    let mut key_names_itr= key_names.iter();
 
     // Get pins corresponding enter and space
     let (enter, space) = {
@@ -158,69 +192,81 @@ fn figure_out_key_matrix<'a>(pinrow: &mut PinRow, key_codes: &[&[u32]], key_name
     for (row_idx, (&row_code, &row_name)) in key_codes_itr
         .zip(key_names_itr).enumerate() {
         println!("Starting row {}/{}, consiting total of {} keys.",
-                 row_idx+2, key_codes_len, row_name.len());
+                 row_idx+2, key_codes_len, row_code.len());
         let old_len = keys.len();
-        'outer: loop {
+        'ask: loop {  // Ask same row of keys again if user makes a typo writing it
             for (key_idx, (&key_code, &key_name)) in row_code.iter()
-                .zip(row_name).enumerate()
-            {
+                .zip(row_name).enumerate() {
                 delay(100);
-                print!("     Press key {}/{}: {}. ", key_idx+1, row_name.len(), key_name);
+                print!("     Press key {}/{}: {}. ", key_idx+1, row_code.len(), key_name);
                 let pair = wait_for_key(pinrow);
-                if pair == enter {
+                if pair == space {  // skip broken key
+                    println!("Skipping that key.");
+                } else if pair == enter {  // Fix typing mistake
                     println!("Starting the same row again.");
                     keys.resize(old_len, (0,0,0,"")).unwrap();
-                    break 'outer;
-                } else if pair == space {
-                    println!("Skipping that key.");
-                } else {
+                    continue 'ask;
+                } else {  // The correct path for key press
                     if keys.iter().any(|&(i, j, _, _)| (i,j) == pair) {
                         println!("That key has been already pressed! Strarting the whole row again.");
                         keys.resize(old_len, (0,0,0,"")).unwrap();
-                        break 'outer;
+                        continue 'ask;
                     }
                     println!("Check.");
-                    assert!(keys.len() < MaxKeys::to_usize(),
+                    assert!(keys.len() < KeysCap::to_usize(),
                         "Maximum number of keys {} exceeded.",
-                        MaxKeys::to_usize());
+                        KeysCap::to_usize());
                     keys.push((pair.0, pair.1, key_code, key_name)).unwrap();
                 }
             }
-            break;  // Typing a row succeeded.
         }
     }
     // Find out input pins and output pins
-    let mut is: Vec<usize, MaxPins> = Vec::new();
-    let mut js: Vec<usize, MaxPins> = Vec::new();
+    // row_to_pin: Index is row in matrix and value is pin number
+    let mut row_to_pin: Vec<usize, MatrixCap> = Vec::new();
+    // col_to_pin: Index is column in matrix and value is pin number
+    let mut col_to_pin: Vec<usize, MatrixCap> = Vec::new();
+
     for &(i, j, _, _) in keys.iter() {
-        if is.iter().position(|&ii| ii==i).is_none() {
-            is.push(i).unwrap();
+        assert!(
+            row_to_pin.len() <= MatrixCap::to_usize() && col_to_pin.len() <= MatrixCap::to_usize()
+            , "Too many pins found (>16), allocated memory ran out."
+        );
+        if row_to_pin.iter().position(|&ii| ii==i).is_none() {
+            row_to_pin.push(i).unwrap();
         }
-        if js.iter().position(|&jj| jj==j).is_none() {
-            js.push(j).unwrap();
+        if col_to_pin.iter().position(|&jj| jj==j).is_none() {
+            col_to_pin.push(j).unwrap();
         }
     }
-    {
-        let is: &mut [usize] = is.as_mut();
-        is.sort_unstable();
-        let js: &mut [usize] = js.as_mut();
-        js.sort_unstable();
+    // Sort them (Yes, syntax is ugly as vector is sorted by using slice cast)
+    AsMut::<[usize]>::as_mut(&mut row_to_pin).sort_unstable();  // useless, already ordered
+    AsMut::<[usize]>::as_mut(&mut col_to_pin).sort_unstable();
+
+    // The inverses of `row_to_pin` and `col_to_pin`.
+    // That is, index corresponds index of pin, and value corresponds the row/column in matrix
+    let mut pin_to_row: Vec<Option<usize>, PinsCap> = full_vec(None, row_to_pin.len());
+    let mut pin_to_col: Vec<Option<usize>, PinsCap> = full_vec(None, col_to_pin.len());
+
+    for (row, &pin) in  row_to_pin.iter().enumerate() {
+        pin_to_row[pin] = Some(row);
+    }
+    for (col, &pin) in  col_to_pin.iter().enumerate() {
+        pin_to_col[pin] = Some(col);
     }
 
-    assert!(is.len() <= MatrixSize::to_usize(), "Too many pins found (>16), allocated memory ran out.");
-    assert!(js.len() <= MatrixSize::to_usize(), "Too many pins found (>16), allocated memory ran out.");
-    let mut matrix_codes: Vec<Vec<Option<u32>, MatrixSize>, MatrixSize> = is.iter()
-        .map(|_| js.iter().map(|_| None).collect()).collect();
-    let mut matrix_names: Vec<Vec<Option<&str>, MatrixSize>, MatrixSize> = is.iter()
-        .map(|_| js.iter().map(|_| None).collect()).collect();
-    // String max width for each column for pretty printing
-    let mut column_max_width: Vec<usize, MatrixSize> = js.iter().map(|_| usize::MIN).collect();
+    let mut code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>
+        = full_vec(full_vec(None, col_to_pin.len()), row_to_pin.len());
+    let mut name_matrix: Vec<Vec<Option<&str>, MatrixCap>, MatrixCap>
+        = full_vec(full_vec(None, col_to_pin.len()), row_to_pin.len());
+    let mut column_max_width: Vec<usize, MatrixCap>  // Width for each column for pretty printing
+        = full_vec(usize::MIN, col_to_pin.len());
 
     for &(i, j, code, name) in keys.iter() {
-        let i_idx = is.iter().position(|&a| a==i).unwrap();
-        let j_idx = js.iter().position(|&a| a==j).unwrap();
-        let code_cell = &mut matrix_codes[i_idx][j_idx];
-        let name_cell = &mut matrix_names[i_idx][j_idx];
+        let i_idx = pin_to_row[i].unwrap();
+        let j_idx = pin_to_col[j].unwrap();
+        let code_cell = &mut code_matrix[i_idx][j_idx];
+        let name_cell = &mut name_matrix[i_idx][j_idx];
         assert!(name_cell.is_none(), "Clash for same matrix item! ({},{}) {} and {}",
                 i, j, name_cell.unwrap(), name);  // This is checked before, should never happen
         *code_cell = Some(code);
@@ -228,17 +274,20 @@ fn figure_out_key_matrix<'a>(pinrow: &mut PinRow, key_codes: &[&[u32]], key_name
         column_max_width[j_idx] = usize::max(column_max_width[j_idx], name.len());
     }
 
+    println!("Here's key matrix. You can copy-paste it to source code.");
     println!("let matrix = [");
-    for row in matrix_names.iter() {
+    for row in name_matrix.iter() {
         print!("    [");
         for (name, width) in row.iter().zip(column_max_width.iter()) {
             print!("{name:>width$}, ", name=name.unwrap_or("0"), width=width);
         }
         println!("],");
     }
-    println!("];");
-
-    return (matrix_codes, is, js);
+    println!("];\n");
+    let mat = KeyMatrix{code_matrix, row_to_pin, col_to_pin, pin_to_row, pin_to_col};
+    println!("Here's, raw representation of key matrix. This can be too copy-pasted to source.");
+    println!("{:#?}", mat);
+    return mat;
 }
 
 
@@ -266,7 +315,7 @@ pub extern fn main() {
         &["b::KEY_A", "b::KEY_S", "b::KEY_D"],
     ];
 
-    let (code_matrix, is, js) = figure_out_key_matrix(
+    let mat = figure_out_key_matrix(
         &mut pinrow, key_codes, key_names
     );
     // let matrix: &[&[usize]] = [
@@ -281,28 +330,18 @@ pub extern fn main() {
 
     let mut keyboard = unsafe{b::Keyboard};
     for _ in 0..10000 {
-        let pair = wait_for_key(&mut pinrow);
-        let i_idx = match is.iter().position(|&a| a==pair.0) {
-            Some(i) => i,
-            None => {println!("Unknown key!"); continue;}
-        };
-        let j_idx = match js.iter().position(|&a| a==pair.1) {
-            Some(i) => i,
-            None => {println!("Unknown key!"); continue;}
-        };
-        match code_matrix[i_idx][j_idx] {
-            Some(code) => {
-                println!("Code: {}", code);
-                //unsafe{keyboard.set_key1(code as u8);}
-                unsafe { keyboard.press(code as u16); }
-                delay(100);
-                unsafe { keyboard.release(code as u16); }
-            },
-            None => {
-                println!("No matrix item for this combination! {:?}", (i_idx, j_idx));
-                continue;
-            },
+        let (i,j) = wait_for_key(&mut pinrow);
+        if let Some(code) = mat.get(i,j) {
+            println!("Code: {}", code);
+            //unsafe{keyboard.set_key1(code as u8);}
+            unsafe { keyboard.press(code as u16); }
+            delay(100);
+            unsafe { keyboard.release(code as u16); }
+        } else {
+            println!("No matrix item for this combination! {:?}", (i, j));
+            continue;
         }
+
     }
 
 
