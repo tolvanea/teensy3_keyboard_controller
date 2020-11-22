@@ -50,11 +50,9 @@ fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
             let i_real_idx = if i < LED_PIN {i} else {i+1};
             let j_real_idx = if i+1+j < LED_PIN {i+1+j} else {i+2+j};
             if pressed {
-                //println!("connection: {:?}", (i_real_idx, j_real_idx));
                 if connection == None {
                     connection = Some((i_real_idx, j_real_idx));
                 } else {
-                    //println!("TODO panic"); // TODO
                     panic!("Multiple connections found: {:?} and {:?}",
                         connection.unwrap(), (i_real_idx, j_real_idx))
                 }
@@ -394,7 +392,7 @@ pub extern fn main() {
         delay(30);
         let v = match keymat.scan_key_press() {
             Some(v) => v,
-            None => {continue;} // Nothing is pressed  // TODO or else?
+            None => {continue;} // Nothing is pressed
         };
         for state in v.into_iter() {
             match state {
