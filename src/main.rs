@@ -83,24 +83,70 @@ where T: Clone, U: ArrayLength<T>
     return a;
 }
 
-#[derive(Debug, Clone)]
+/// Translate GPIO pin port connection to key codes that will be send over usb
+#[derive(Debug)]
 struct KeyMatrix {
+    /// Key code matrix
     code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>,
+    /// Voltage source pins
+    row_pins: Vec<Pin, MatrixCap>,
+    /// Voltage drain pins
+    col_pins: Vec<Pin, MatrixCap>,
+    /// Index corresponds rows in matrix, and the value is GPIO port number
     row_to_pin: Vec<usize, MatrixCap>,
+    /// Index corresponds columns in matrix, and the value is GPIO port number
     col_to_pin: Vec<usize, MatrixCap>,
+    /// The inverses of `row_to_pin`, that is, index corresponds to GPIO port number,
+    /// and value corresponds the row in matrix
     pin_to_row: Vec<Option<usize>, PinsCap>,
+    /// The inverses of `col_to_pin`
     pin_to_col: Vec<Option<usize>, PinsCap>,
+}
+
+/// When keys are scanned, one scan row can find one key. However if more than one key per scan row
+/// is pressed at the same time, then do not register those presses.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum ScanRowState {
+    NotPressed,
+    Pressed(Option<u32>),
+    TooManyKeysPressed,
 }
 
 impl KeyMatrix {
     /// Fetch the keycode corresponding connection of some pin indices. If there is no keycode
-    /// for that pair, panic.
+    /// for that pair, panic. This should not be used.
     fn get(&self, i: usize, j: usize) -> Option<u32> {
         let (i, j) = if i < j {(i, j)} else {(j, i)};  // put in order
         if i < self.pin_to_row.len() || j < self.pin_to_col.len() {
             self.code_matrix[self.pin_to_row[i]?][self.pin_to_col[j]?]
         } else {
             None  // Out of bounds
+        }
+    }
+
+    /// Return None if nothing is pressed. Keycode is None if that value is not in matrix
+    fn scan_key_press(&mut self) -> Option<Vec<ScanRowState, MatrixCap>> {
+        let mut v: Vec<ScanRowState, MatrixCap> = full_vec(ScanRowState::NotPressed, self.row_pins.len());
+        for (col, drain) in self.col_pins.iter_mut().enumerate() {
+            drain.digital_write(false);  // enable drain
+            for (row, source) in self.row_pins.iter().enumerate() {
+                let pressed = !source.digital_read();  // check if connected
+                if pressed {
+                    let code = self.code_matrix[row][col];
+                    v[row] = match v[row] {  // Test that if key scan row already been activated
+                        ScanRowState::NotPressed => ScanRowState::Pressed(code),
+                        ScanRowState::Pressed(_) => ScanRowState::TooManyKeysPressed,
+                        ScanRowState::TooManyKeysPressed => ScanRowState::TooManyKeysPressed,
+                    };
+                }
+            }
+            drain.digital_write(true);  // disable drain
+            delay(1); // It takes time for pullup pin to charge back to full voltage
+        }
+        if v.iter().all(|state| *state == ScanRowState::NotPressed) {
+            return None;
+        } else {
+            return Some(v);
         }
     }
 }
@@ -248,12 +294,27 @@ fn figure_out_key_matrix<'a>(
     let mut pin_to_row: Vec<Option<usize>, PinsCap> = full_vec(None, row_to_pin.len());
     let mut pin_to_col: Vec<Option<usize>, PinsCap> = full_vec(None, col_to_pin.len());
 
-    for (row, &pin) in  row_to_pin.iter().enumerate() {
+    for (row, &pin) in row_to_pin.iter().enumerate() {
         pin_to_row[pin] = Some(row);
     }
-    for (col, &pin) in  col_to_pin.iter().enumerate() {
+    for (col, &pin) in col_to_pin.iter().enumerate() {
         pin_to_col[pin] = Some(col);
     }
+
+    assert!(row_to_pin.iter().all(|&pin| pin_to_col[pin].is_none()),
+            "Internal error! Overlap with input and output pins.");
+
+    let row_pins: Vec<Pin, MatrixCap> = row_to_pin.iter()
+        .map(|&i| {
+            pinrow.get_pin(i, PinMode::InputPullup)
+        }).collect();
+
+    let col_pins: Vec<Pin, MatrixCap> = col_to_pin.iter()
+        .map(|&j| {
+            let mut p = pinrow.get_pin(j, PinMode::OutputOpenDrain);
+            p.digital_write(true);  // By default disable drain
+            p
+        }).collect();
 
     let mut code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>
         = full_vec(full_vec(None, col_to_pin.len()), row_to_pin.len());
@@ -284,7 +345,10 @@ fn figure_out_key_matrix<'a>(
         println!("],");
     }
     println!("];\n");
-    let mat = KeyMatrix{code_matrix, row_to_pin, col_to_pin, pin_to_row, pin_to_col};
+
+    let mat = KeyMatrix{
+        code_matrix, row_pins, col_pins, row_to_pin, col_to_pin, pin_to_row, pin_to_col
+    };
     println!("Here's, raw representation of key matrix. This can be too copy-pasted to source.");
     println!("{:#?}", mat);
     return mat;
@@ -295,13 +359,10 @@ fn figure_out_key_matrix<'a>(
 pub extern fn main() {
     let mut pinrow = setup();
     let mut led = pinrow.get_led();
-    for _ in 0..3 {
+    for _ in 0..2 {
         alive(&mut led);
     }
     println!("Hellouu!");
-    // THIS!
-    //let _p3 = pinrow.get_pin(3, PinMode::OutputOpenDrain);
-    //let p4 = pinrow.get_pin(4, PinMode::InputPullup);
 
     let key_codes: &[&[u32]] = &[
         &[b::KEY_ENTER, b::KEY_SPACE],
@@ -315,7 +376,7 @@ pub extern fn main() {
         &["b::KEY_A", "b::KEY_S", "b::KEY_D"],
     ];
 
-    let mat = figure_out_key_matrix(
+    let mut keymat = figure_out_key_matrix(
         &mut pinrow, key_codes, key_names
     );
     // let matrix: &[&[usize]] = [
@@ -330,48 +391,40 @@ pub extern fn main() {
 
     let mut keyboard = unsafe{b::Keyboard};
     for _ in 0..10000 {
-        let (i,j) = wait_for_key(&mut pinrow);
-        if let Some(code) = mat.get(i,j) {
-            println!("Code: {}", code);
-            //unsafe{keyboard.set_key1(code as u8);}
-            unsafe { keyboard.press(code as u16); }
-            delay(100);
-            unsafe { keyboard.release(code as u16); }
-        } else {
-            println!("No matrix item for this combination! {:?}", (i, j));
-            continue;
+        delay(30);
+        let v = match keymat.scan_key_press() {
+            Some(v) => v,
+            None => {continue;} // Nothing is pressed  // TODO or else?
+        };
+        for state in v.into_iter() {
+            match state {
+                ScanRowState::NotPressed => continue,
+                ScanRowState::Pressed(c) => {
+                    if let Some(code) = c {
+                        unsafe { keyboard.press(code as u16); }
+                        delay(30);
+                        unsafe { keyboard.release(code as u16); }
+                    } else {
+                        println!("Warning! Unknown key in matrix.");
+                    }
+                },
+                ScanRowState::TooManyKeysPressed => {
+                    println!("Uh oh! Multible keys pressed! Nothing is registered.");
+                },
+            }
         }
-
     }
 
-
-    for _j in 0.. {
-        //println!("j {}", j);
-        let _pair = wait_for_key(&mut pinrow);
-        delay(100)
-    }
 
     led.digital_write(false); // Set led off
-    let mut i = 0;
 
     // Blink Loop
-    loop {
-        i += 1;
+    for i in 0.. {
         println!("{}", i);
         // Show we are alive by blinking
         alive(&mut led);
-        // unsafe {
-        //     println!("{} 3-4: {}{}", i,
-        //         bindings::digitalRead(3), bindings::digitalRead(4));
-        // }
-        // if !p4.digital_read() {
-        //     println!("#############################################");
-        // }
-
         // Keep 2 second pause in blinking the led, also don't spam the console
-        //delay(1000);
-
-
+        delay(1000);
     }
 }
 
