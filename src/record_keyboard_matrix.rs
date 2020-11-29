@@ -72,7 +72,7 @@ fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
             pin_j.digital_write(false);  // enable drain
             let pressed = !pin_i.digital_read();  // check if `pin_i` and `pin_j` are connected
             pin_j.digital_write(true);  // disable drain
-            if pressed {delay(1);}  // It takes time for pullup pin to charge back!
+            if pressed {delay(4);}  // It takes time for pullup pin to charge back!
 
             let i_real_idx = if i < LED_PIN {i} else {i+1};
             let j_real_idx = if i+1+j < LED_PIN {i+1+j} else {i+2+j};
@@ -185,7 +185,7 @@ pub fn figure_out_key_matrix<'a>(
             delay(200);
         }
         let backspace = (keys[0].0, keys[0].1);
-        let delete = (keys[1].0, keys[2].1);
+        let delete = (keys[1].0, keys[1].1);
         assert!(backspace != delete, "These two keys can not be the same!");
         println!("First row of keycodes successfully processed.");
         (backspace, delete)
@@ -220,6 +220,7 @@ pub fn figure_out_key_matrix<'a>(
                     keys.push((pair.0, pair.1, key_code, key_name)).unwrap();
                 }
             }
+            break;
         }
     }
     // Find out input pins and output pins
@@ -228,26 +229,53 @@ pub fn figure_out_key_matrix<'a>(
     // col_to_pin: Index is column in matrix and value is pin number
     let mut col_to_pin: Vec<usize, MatrixCap> = Vec::new();
 
-    for &(i, j, _, _) in keys.iter() {
+    for (i, j, _, name) in keys.iter_mut() {
         assert!(
             row_to_pin.len() <= MatrixCap::to_usize() && col_to_pin.len() <= MatrixCap::to_usize()
             , "Too many pins found (>16), allocated memory ran out."
         );
-        if row_to_pin.iter().position(|&ii| ii==i).is_none() {
-            row_to_pin.push(i).unwrap();
+        assert_ne!(*i, *j);
+        println!("{:?}", (*i, *j));
+
+        let (i_in_rows, j_in_rows) = row_to_pin.iter().fold(
+            (false, false),
+            |(acc_i, acc_j), &pin| (acc_i || (*i==pin), acc_j || (*j==pin))
+        );
+        let (i_in_cols, j_in_cols) = col_to_pin.iter().fold(
+            (false, false),
+            |(acc_i, acc_j), &pin| (acc_i || (*i==pin), acc_j || (*j==pin))
+        );
+
+        if !i_in_rows && !i_in_cols{
+            row_to_pin.push(*i).unwrap();
         }
-        if col_to_pin.iter().position(|&jj| jj==j).is_none() {
-            col_to_pin.push(j).unwrap();
+        if !j_in_rows && !j_in_cols {
+            col_to_pin.push(*j).unwrap();
+        }
+        // TOOD iteroit ätät läpi monesti
+
+        assert!(
+            !(i_in_cols && j_in_cols) && !(i_in_rows && j_in_rows),
+            "Error, some pin is both source and drain at the same time.\n\
+            pin: {:?}, key name: {:?}\n\
+            source pins so far: {:?}\n\
+            drain pins so far: {:?}", (*i,*j), name, row_to_pin, col_to_pin
+        );
+
+        // if i and j are flipped then flip them back
+        if i_in_cols || j_in_rows {
+            core::mem::swap(i,j);
         }
     }
+
     // Sort them. (Syntax is ugly because vector is sorted by using slice cast.)
     AsMut::<[usize]>::as_mut(&mut row_to_pin).sort_unstable();  // actually useless, already ordered
     AsMut::<[usize]>::as_mut(&mut col_to_pin).sort_unstable();
 
     // The inverses of `row_to_pin` and `col_to_pin`.
     // That is, index corresponds index of pin, and value corresponds the row/column in matrix
-    let mut pin_to_row: Vec<Option<usize>, PinsCap> = full_vec(None, row_to_pin.len());
-    let mut pin_to_col: Vec<Option<usize>, PinsCap> = full_vec(None, col_to_pin.len());
+    let mut pin_to_row: Vec<Option<usize>, PinsCap> = full_vec(None, NUM_PINS);
+    let mut pin_to_col: Vec<Option<usize>, PinsCap> = full_vec(None, NUM_PINS);
 
     for (row, &pin) in row_to_pin.iter().enumerate() {
         pin_to_row[pin] = Some(row);
@@ -256,6 +284,10 @@ pub fn figure_out_key_matrix<'a>(
         pin_to_col[pin] = Some(col);
     }
 
+    println!("--");
+    row_to_pin.iter().for_each(|&pin| {println!("pin {:?} col {:?}", pin, pin_to_col[pin]);});
+    println!("--");
+    col_to_pin.iter().for_each(|&pin| {println!("pin {:?} row {:?}", pin, pin_to_row[pin]);});
     assert!(row_to_pin.iter().all(|&pin| pin_to_col[pin].is_none()),
             "Internal error! Overlap with input and output pins.");
 
