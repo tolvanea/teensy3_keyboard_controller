@@ -280,6 +280,20 @@ fn separate_pins_to_rows_and_columns(
         iter.any(|x| x==val)
     }
 
+    let counterparts: Vec<Vec<usize, MatrixCap>, PinsCap> = pins.iter()
+        .map(
+            |&p| keys.iter()
+                .filter_map(|&(i, j, _, _)|
+                    if i==p.unwrap() {
+                        Some(j)
+                    } else if j==p.unwrap() {
+                        Some(i)
+                    } else {
+                        None
+                    })
+                .collect()
+        ).collect();
+
     let mut passed_one_round_and_found_nothing = false;
 
     // Classify `pins` to two groups: `row_pins` and `col_pins`
@@ -287,21 +301,13 @@ fn separate_pins_to_rows_and_columns(
         if pins.iter().all(|p| p.is_none()) {
             break; // No more pins to classify, job done
         }
-        let unclassified_pins = pins.iter_mut().filter(|p| p.is_some());
+        let unclassified_pins = pins.iter_mut().enumerate().
+            filter(|(_, p)| p.is_some());
 
         // take first unclassified pin from list and replace it with None.
-        for (idx, unclassified_pin) in unclassified_pins.enumerate() {
+        for (unclassified_idx, (total_idx, unclassified_pin)) in unclassified_pins.enumerate() {
             let pin = unclassified_pin.unwrap();
 
-            // Iterate connection-pairs and collect corresponding pins for this particular pin
-            let mut pin_pairs: Vec<usize, PinsCap> = Vec::new();
-            for &(i, j, _, _) in keys.iter(){
-                if i == pin {
-                    pin_pairs.push(j).unwrap();
-                } else if j == pin {
-                    pin_pairs.push(i).unwrap();
-                }
-            }
             enum PinType {
                 RowPin,
                 ColPin,
@@ -310,7 +316,7 @@ fn separate_pins_to_rows_and_columns(
             use PinType::*;
             let mut typ = Neither;
             for row_pin in row_pins.iter() {
-                if contains(pin_pairs.iter(), row_pin) {
+                if contains(counterparts[total_idx].iter(), row_pin) {
                     match typ {
                         RowPin => { panic!("Error, some pin is both source and drain."); },
                         ColPin => {},
@@ -319,7 +325,7 @@ fn separate_pins_to_rows_and_columns(
                 }
             }
             for col_pin in col_pins.iter() {
-                if contains(pin_pairs.iter(), col_pin) {
+                if contains(counterparts[total_idx].iter(), col_pin) {
                     match typ {
                         RowPin => {},
                         ColPin => { panic!("Error, some pin is both source and drain."); },
@@ -334,8 +340,7 @@ fn separate_pins_to_rows_and_columns(
                     // If all pins are already iterated through, and no constraints is found, then
                     // it does not matter where the first pin is classified. So choose then freely
                     // whether it is row or column pin.
-                    if (idx == 0) && passed_one_round_and_found_nothing {
-                        println!("Iterated all through and it does not matter for {}", pin);
+                    if (unclassified_idx == 0) && passed_one_round_and_found_nothing {
                         if row_pins.len() < col_pins.len() {
                             &mut row_pins
                         } else {
@@ -364,7 +369,8 @@ fn separate_pins_to_rows_and_columns(
             |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
         );
 
-        assert!((i_in_rows && j_in_cols) || (i_in_cols && j_in_rows));
+        assert!((i_in_rows && j_in_cols) || (i_in_cols && j_in_rows),
+                "{} {} {} {}", i_in_rows, j_in_cols, i_in_cols, j_in_rows);
 
         if i_in_cols && j_in_rows {
             core::mem::swap(i, j);
