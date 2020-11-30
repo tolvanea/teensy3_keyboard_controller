@@ -229,47 +229,165 @@ pub fn figure_out_key_matrix<'a>(
     // col_to_pin: Index is column in matrix and value is pin number
     let mut col_to_pin: Vec<usize, MatrixCap> = Vec::new();
 
-    for (i, j, _, name) in keys.iter_mut() {
+    let mut pins: Vec<Option<usize>, PinsCap> = Vec::new();
+    for &(i, j, _, _) in keys.iter() {
+        assert_ne!(i, j);
         assert!(
-            row_to_pin.len() <= MatrixCap::to_usize() && col_to_pin.len() <= MatrixCap::to_usize()
-            , "Too many pins found (>16), allocated memory ran out."
+            pins.len() <= PinsCap::to_usize(),
+            "Too many pins found (>16), allocated memory ran out."
         );
-        assert_ne!(*i, *j);
-        println!("{:?}", (*i, *j));
-
-        let (i_in_rows, j_in_rows) = row_to_pin.iter().fold(
+        let (i_in_pins, j_in_pins) = pins.iter().map(|p| p.unwrap()).fold(
             (false, false),
-            |(acc_i, acc_j), &pin| (acc_i || (*i==pin), acc_j || (*j==pin))
+            |(acc_i, acc_j), pin| (acc_i || (i == pin), acc_j || (j == pin))
         );
-        let (i_in_cols, j_in_cols) = col_to_pin.iter().fold(
-            (false, false),
-            |(acc_i, acc_j), &pin| (acc_i || (*i==pin), acc_j || (*j==pin))
-        );
-
-        if !i_in_rows && !i_in_cols{
-            row_to_pin.push(*i).unwrap();
+        if !i_in_pins {
+            pins.push(Some(i)).unwrap();
         }
-        if !j_in_rows && !j_in_cols {
-            col_to_pin.push(*j).unwrap();
-        }
-        // TOOD iteroit ätät läpi monesti
-
-        assert!(
-            !(i_in_cols && j_in_cols) && !(i_in_rows && j_in_rows),
-            "Error, some pin is both source and drain at the same time.\n\
-            pin: {:?}, key name: {:?}\n\
-            source pins so far: {:?}\n\
-            drain pins so far: {:?}", (*i,*j), name, row_to_pin, col_to_pin
-        );
-
-        // if i and j are flipped then flip them back
-        if i_in_cols || j_in_rows {
-            core::mem::swap(i,j);
+        if !j_in_pins {
+            pins.push(Some(j)).unwrap();
         }
     }
 
+    // Classify one pin as row pin, and let the rest be determined by that.
+    row_to_pin.push(pins.pop().unwrap().unwrap()).unwrap();
+
+    fn contains<T: PartialEq, I: Iterator<Item=T>>(mut iter: I, val: T) -> bool {
+        iter.any(|x| x==val)
+    }
+
+    let mut passed_one_round_and_found_nothing = false;
+
+    // Classify `pins` to two groups: `row_to_pin` and `col_to_pin`
+    'l: loop {
+        if pins.iter().all(|p| p.is_none()) {
+            break; // No more pins to classify, job done
+        }
+        let unclassified_pins = pins.iter_mut().filter(|p| p.is_some());
+
+        // take first unclassified pin from list and replace it with None.
+        for (idx, unclassified_pin) in unclassified_pins.enumerate() {
+            let pin = unclassified_pin.unwrap();
+
+            // Iterate connection-pairs and collect corresponding pins for this particular pin
+            let mut pin_pairs: Vec<usize, PinsCap> = Vec::new();
+            for &(i, j, _, _) in keys.iter(){
+                if i == pin {
+                    pin_pairs.push(j).unwrap();
+                } else if j == pin {
+                    pin_pairs.push(i).unwrap();
+                }
+            }
+            enum PinType {
+                RowPin,
+                ColPin,
+                Neither,
+            }
+            use PinType::*;
+            let mut typ = Neither;
+            for row_pin in row_to_pin.iter() {
+                if contains(pin_pairs.iter(), row_pin) {
+                    match typ {
+                        RowPin => { panic!("Error, some pin is both source and drain."); },
+                        ColPin => {},
+                        Neither => { typ = ColPin; println!("{} will be classified as Col", pin);},
+                    }
+                }
+            }
+            for col_pin in col_to_pin.iter() {
+                if contains(pin_pairs.iter(), col_pin) {
+                    match typ {
+                        RowPin => {},
+                        ColPin => { panic!("Error, some pin is both source and drain."); },
+                        Neither => { typ = RowPin; println!("{} will be classified as Row", pin);},
+                    }
+                }
+            }
+            let container = match typ {
+                RowPin => &mut row_to_pin,
+                ColPin => &mut col_to_pin,
+                Neither => {
+                    // If all pins are already iterated through, and no constraints is found, then
+                    // it does not matter where the first pin is classified. So choose then freely
+                    // whether it is row or column pin.
+                    if (idx == 0) && passed_one_round_and_found_nothing {
+                        println!("Iterated all through and it does not matter for {}", pin);
+                        if row_to_pin.len() < col_to_pin.len() {
+                            &mut row_to_pin
+                        } else {
+                            &mut col_to_pin
+                        }
+                    } else {
+                        continue // keep iterating
+                    }
+                },
+            };
+            container.push(pin).unwrap();
+            *unclassified_pin = None;
+            continue 'l;
+        }
+        passed_one_round_and_found_nothing = true;
+    }
+
+    // assure that i is always row index and j column index
+    for (i, j, _, _) in keys.iter_mut() {
+        let (i_in_rows, j_in_rows) = row_to_pin.iter().fold(
+            (false, false),
+            |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
+        );
+        let (i_in_cols, j_in_cols) = col_to_pin.iter().fold(
+            (false, false),
+            |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
+        );
+
+        assert!((i_in_rows && j_in_cols) || (i_in_cols && j_in_rows));
+
+        if i_in_cols && j_in_rows {
+            core::mem::swap(i, j);
+        }
+    }
+
+    // if false {
+    //     for (i, j, _, name) in keys.iter_mut() {
+    //         assert!(
+    //             row_to_pin.len() <= MatrixCap::to_usize() && col_to_pin.len() <= MatrixCap::to_usize()
+    //             , "Too many pins found (>16), allocated memory ran out."
+    //         );
+    //         assert_ne!(*i, *j);
+    //         println!("{:?}", (*i, *j));
+    //
+    //         let (i_in_rows, j_in_rows) = row_to_pin.iter().fold(
+    //             (false, false),
+    //             |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
+    //         );
+    //         let (i_in_cols, j_in_cols) = col_to_pin.iter().fold(
+    //             (false, false),
+    //             |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
+    //         );
+    //
+    //         if !i_in_rows && !i_in_cols {
+    //             row_to_pin.push(*i).unwrap();
+    //         }
+    //         if !j_in_rows && !j_in_cols {
+    //             col_to_pin.push(*j).unwrap();
+    //         }
+    //
+    //         assert!(
+    //             !(i_in_cols && j_in_cols) && !(i_in_rows && j_in_rows),
+    //             "Error, some pin is both source and drain at the same time.\n\
+    //         pin: {:?}, key name: {:?}\n\
+    //         source pins so far: {:?}\n\
+    //         drain pins so far: {:?}", (*i, *j), name, row_to_pin, col_to_pin
+    //         );
+    //
+    //         // if i and j are flipped then flip them back
+    //         if i_in_cols || j_in_rows {
+    //             core::mem::swap(i, j);
+    //         }
+    //     }
+    // }
+
     // Sort them. (Syntax is ugly because vector is sorted by using slice cast.)
-    AsMut::<[usize]>::as_mut(&mut row_to_pin).sort_unstable();  // actually useless, already ordered
+    AsMut::<[usize]>::as_mut(&mut row_to_pin).sort_unstable();
     AsMut::<[usize]>::as_mut(&mut col_to_pin).sort_unstable();
 
     // The inverses of `row_to_pin` and `col_to_pin`.
@@ -284,12 +402,16 @@ pub fn figure_out_key_matrix<'a>(
         pin_to_col[pin] = Some(col);
     }
 
-    println!("--");
-    row_to_pin.iter().for_each(|&pin| {println!("pin {:?} col {:?}", pin, pin_to_col[pin]);});
-    println!("--");
-    col_to_pin.iter().for_each(|&pin| {println!("pin {:?} row {:?}", pin, pin_to_row[pin]);});
-    assert!(row_to_pin.iter().all(|&pin| pin_to_col[pin].is_none()),
-            "Internal error! Overlap with input and output pins.");
+    assert!(
+        row_to_pin.enumerate().iter().all(|(i, &pin)| i==pin_to_row[pin].unwrap())
+            && col_to_pin.enumerate().iter().all(|(i, &pin)| i==col_to_row[pin].unwrap()),
+        "Internal error! Pin inverse vec is wrong."
+    );
+    assert!(
+        row_to_pin.iter().all(|&pin| pin_to_col[pin].is_none())
+            && col_to_pin.iter().all(|&pin| pin_to_row[pin].is_none()),
+        "Internal error! Overlap with input and output pins."
+    );
 
     let mut code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>
         = full_vec(full_vec(None, col_to_pin.len()), row_to_pin.len());
