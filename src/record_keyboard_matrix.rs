@@ -18,13 +18,13 @@ use crate::process_keys::{KeyMatrix, MatrixCap};
 #[allow(dead_code)]
 struct KeyIndices {
     /// Index corresponds rows in matrix, and the value is GPIO port number
-    row_to_pin: Vec<usize, MatrixCap>,
+    row_pins: Vec<usize, MatrixCap>,
     /// Index corresponds columns in matrix, and the value is GPIO port number
-    col_to_pin: Vec<usize, MatrixCap>,
-    /// The inverses of `row_to_pin`, that is, index corresponds to GPIO port number,
+    col_pins: Vec<usize, MatrixCap>,
+    /// The inverses of `row_pins`, that is, index corresponds to GPIO port number,
     /// and value corresponds the row in matrix
     pin_to_row: Vec<Option<usize>, PinsCap>,
-    /// The inverses of `col_to_pin`
+    /// The inverses of `col_pins`
     pin_to_col: Vec<Option<usize>, PinsCap>,
 }
 
@@ -42,65 +42,6 @@ impl KeyIndices {
     }
 }
 
-
-/// Find out what to pins are electrically connected. This corresponds to key press. Scan pins
-/// by iterating ALL possible pin combinations, which is not very efficient, especially if key
-/// matrix is known. So use this only when you do not know how many columns and rows key matrix
-/// contains.
-fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
-    // Connected pins. There should be only ONE pin pair connected
-    let mut connection: Option<(usize, usize)> = None;
-
-    assert!(NUM_PINS <= PinsCap::to_usize(), "Allocated memory ran out, too many pins");
-    // Set all pins to drain mode, but by default disable them. They will be turned on
-    // only to check whether some particular connection exists
-    let mut pins: Vec<Pin, PinsCap> = (0..NUM_PINS).filter(|&i| i != LED_PIN)
-        .map(|i| {
-            let mut p = pinrow.get_pin(i, PinMode::OutputOpenDrain);
-            p.digital_write(true);  // By default disable drain
-            p
-        })
-        .collect();
-    // Check connections, and set drain pins one by one to source pins.
-    for i in 0..pins.len() {
-        // Pins [0..i+1] are source pins "i", and [i+1..NUM_PINS] are drain pins "j"
-        let (i_pins, j_pins) = pins.split_at_mut(i+1);
-        let pin_i = &mut i_pins[i];
-        pin_i.set_mode(PinMode::InputPullup);  // Make `pin_i` voltage source
-        delay(1);
-        for (j, pin_j) in j_pins.iter_mut().enumerate() {
-            pin_j.digital_write(false);  // enable drain
-            let pressed = !pin_i.digital_read();  // check if `pin_i` and `pin_j` are connected
-            pin_j.digital_write(true);  // disable drain
-            if pressed {delay(4);}  // It takes time for pullup pin to charge back!
-
-            let i_real_idx = if i < LED_PIN {i} else {i+1};
-            let j_real_idx = if i+1+j < LED_PIN {i+1+j} else {i+2+j};
-            if pressed {
-                if connection == None {
-                    connection = Some((i_real_idx, j_real_idx));
-                } else {
-                    println!("Warning! Multiple connections found: {:?} and {:?}. Ignoring both.",
-                             connection.unwrap(), (i_real_idx, j_real_idx));
-                    return None;
-                }
-            }
-        }
-    }
-    pins.into_iter().for_each(|pin| pinrow.return_pin(pin));
-    return connection;
-}
-
-/// Loops until some key is pressed
-fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
-    let pair = loop {
-        match scan_key_press(pinrow) {
-            Some(pair) => {break pair;},
-            None => {delay(10);},
-        }
-    };
-    return pair;
-}
 
 /// Utility tool that finds out key matrix. User presses through every single key through in
 /// keyboard. Keys 'Backspace' and 'Delete' are used to fix typos and other problems in typing
@@ -149,6 +90,18 @@ pub fn figure_out_key_matrix<'a>(
     key_names: &[&[&'a str]]
 ) -> KeyMatrix
 {
+    let mut keys = query_keys_from_user(pinrow, key_codes, key_names);
+    let (mut row_pins, mut col_pins) = separate_pins_to_rows_and_columns(&mut keys);
+    let code_matrix = build_and_print_code_matrix(&mut keys, &mut row_pins, &mut col_pins);
+    let mat = KeyMatrix::new(pinrow, code_matrix, row_pins, col_pins);
+    return mat;
+}
+
+fn query_keys_from_user<'a>(
+    pinrow: &mut PinRow,
+    key_codes: &[&[u32]],
+    key_names: &[&[&'a str]]
+) -> Vec<(usize, usize, u32, &'a str), KeysCap> {
     assert!(key_codes[0].len() == 2,
         r#"First list in `key_codes` should contain only Enter and Space.\n\
         The list may look something like the following:\n\
@@ -223,18 +176,90 @@ pub fn figure_out_key_matrix<'a>(
             break;
         }
     }
-    // Find out input pins and output pins
-    // row_to_pin: Index is row in matrix and value is pin number
-    let mut row_to_pin: Vec<usize, MatrixCap> = Vec::new();
-    // col_to_pin: Index is column in matrix and value is pin number
-    let mut col_to_pin: Vec<usize, MatrixCap> = Vec::new();
+    return keys;
+}
+
+
+/// Find out what to pins are electrically connected. This corresponds to key press. Scan pins
+/// by iterating ALL possible pin combinations, which is not very efficient, especially if key
+/// matrix is known. So use this only when you do not know how many columns and rows key matrix
+/// contains.
+fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
+    // Connected pins. There should be only ONE pin pair connected
+    let mut connection: Option<(usize, usize)> = None;
+
+    assert!(NUM_PINS <= PinsCap::to_usize(), "Allocated memory ran out, too many pins");
+    // Set all pins to drain mode, but by default disable them. They will be turned on
+    // only to check whether some particular connection exists
+    let mut pins: Vec<Pin, PinsCap> = (0..NUM_PINS).filter(|&i| i != LED_PIN)
+        .map(|i| {
+            let mut p = pinrow.get_pin(i, PinMode::OutputOpenDrain);
+            p.digital_write(true);  // By default disable drain
+            p
+        })
+        .collect();
+    // Check connections, and set drain pins one by one to source pins.
+    for i in 0..pins.len() {
+        // Pins [0..i+1] are source pins "i", and [i+1..NUM_PINS] are drain pins "j"
+        let (i_pins, j_pins) = pins.split_at_mut(i+1);
+        let pin_i = &mut i_pins[i];
+        pin_i.set_mode(PinMode::InputPullup);  // Make `pin_i` voltage source
+        delay(1);
+        for (j, pin_j) in j_pins.iter_mut().enumerate() {
+            pin_j.digital_write(false);  // enable drain
+            let pressed = !pin_i.digital_read();  // check if `pin_i` and `pin_j` are connected
+            pin_j.digital_write(true);  // disable drain
+            if pressed {delay(4);}  // It takes time for pullup pin to charge back!
+
+            let i_real_idx = if i < LED_PIN {i} else {i+1};
+            let j_real_idx = if i+1+j < LED_PIN {i+1+j} else {i+2+j};
+            if pressed {
+                if connection == None {
+                    connection = Some((i_real_idx, j_real_idx));
+                } else {
+                    println!("Warning! Multiple connections found: {:?} and {:?}. Ignoring both.",
+                             connection.unwrap(), (i_real_idx, j_real_idx));
+                    return None;
+                }
+            }
+        }
+    }
+    pins.into_iter().for_each(|pin| pinrow.return_pin(pin));
+    return connection;
+}
+
+/// Loops until some key is pressed
+fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
+    let pair = loop {
+        match scan_key_press(pinrow) {
+            Some(pair) => {break pair;},
+            None => {delay(10);},
+        }
+    };
+    return pair;
+}
+
+
+/// Separate pins to inputs and outputs (i.e. sources and drains). This is not as easy task
+/// as it may first appear. The separation for pin must be consistent within all other pins.
+/// The task is accomplished with O(n^3) algorithm, which sweeps pins over and over again,
+/// and classifies pins to rows or columns if it is known that the counterpart is row/column.
+/// Sometimes pin can be chosen either way without contradictions, and then classification is
+/// done to balance row/column count.
+fn separate_pins_to_rows_and_columns(
+    keys: &mut Vec<(usize, usize, u32, &str), KeysCap>
+) -> (Vec<usize, MatrixCap>, Vec<usize, MatrixCap>){
+    // row_pins: Index is row in matrix and value is pin number
+    let mut row_pins: Vec<usize, MatrixCap> = Vec::new();
+    // col_pins: Index is column in matrix and value is pin number
+    let mut col_pins: Vec<usize, MatrixCap> = Vec::new();
 
     let mut pins: Vec<Option<usize>, PinsCap> = Vec::new();
     for &(i, j, _, _) in keys.iter() {
         assert_ne!(i, j);
         assert!(
             pins.len() <= PinsCap::to_usize(),
-            "Too many pins found (>16), allocated memory ran out."
+            "Too many pins found (>64), allocated memory ran out."
         );
         let (i_in_pins, j_in_pins) = pins.iter().map(|p| p.unwrap()).fold(
             (false, false),
@@ -249,7 +274,7 @@ pub fn figure_out_key_matrix<'a>(
     }
 
     // Classify one pin as row pin, and let the rest be determined by that.
-    row_to_pin.push(pins.pop().unwrap().unwrap()).unwrap();
+    row_pins.push(pins.pop().unwrap().unwrap()).unwrap();
 
     fn contains<T: PartialEq, I: Iterator<Item=T>>(mut iter: I, val: T) -> bool {
         iter.any(|x| x==val)
@@ -257,7 +282,7 @@ pub fn figure_out_key_matrix<'a>(
 
     let mut passed_one_round_and_found_nothing = false;
 
-    // Classify `pins` to two groups: `row_to_pin` and `col_to_pin`
+    // Classify `pins` to two groups: `row_pins` and `col_pins`
     'l: loop {
         if pins.iter().all(|p| p.is_none()) {
             break; // No more pins to classify, job done
@@ -284,7 +309,7 @@ pub fn figure_out_key_matrix<'a>(
             }
             use PinType::*;
             let mut typ = Neither;
-            for row_pin in row_to_pin.iter() {
+            for row_pin in row_pins.iter() {
                 if contains(pin_pairs.iter(), row_pin) {
                     match typ {
                         RowPin => { panic!("Error, some pin is both source and drain."); },
@@ -293,7 +318,7 @@ pub fn figure_out_key_matrix<'a>(
                     }
                 }
             }
-            for col_pin in col_to_pin.iter() {
+            for col_pin in col_pins.iter() {
                 if contains(pin_pairs.iter(), col_pin) {
                     match typ {
                         RowPin => {},
@@ -303,18 +328,18 @@ pub fn figure_out_key_matrix<'a>(
                 }
             }
             let container = match typ {
-                RowPin => &mut row_to_pin,
-                ColPin => &mut col_to_pin,
+                RowPin => &mut row_pins,
+                ColPin => &mut col_pins,
                 Neither => {
                     // If all pins are already iterated through, and no constraints is found, then
                     // it does not matter where the first pin is classified. So choose then freely
                     // whether it is row or column pin.
                     if (idx == 0) && passed_one_round_and_found_nothing {
                         println!("Iterated all through and it does not matter for {}", pin);
-                        if row_to_pin.len() < col_to_pin.len() {
-                            &mut row_to_pin
+                        if row_pins.len() < col_pins.len() {
+                            &mut row_pins
                         } else {
-                            &mut col_to_pin
+                            &mut col_pins
                         }
                     } else {
                         continue // keep iterating
@@ -330,11 +355,11 @@ pub fn figure_out_key_matrix<'a>(
 
     // assure that i is always row index and j column index
     for (i, j, _, _) in keys.iter_mut() {
-        let (i_in_rows, j_in_rows) = row_to_pin.iter().fold(
+        let (i_in_rows, j_in_rows) = row_pins.iter().fold(
             (false, false),
             |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
         );
-        let (i_in_cols, j_in_cols) = col_to_pin.iter().fold(
+        let (i_in_cols, j_in_cols) = col_pins.iter().fold(
             (false, false),
             |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
         );
@@ -346,83 +371,52 @@ pub fn figure_out_key_matrix<'a>(
         }
     }
 
-    // if false {
-    //     for (i, j, _, name) in keys.iter_mut() {
-    //         assert!(
-    //             row_to_pin.len() <= MatrixCap::to_usize() && col_to_pin.len() <= MatrixCap::to_usize()
-    //             , "Too many pins found (>16), allocated memory ran out."
-    //         );
-    //         assert_ne!(*i, *j);
-    //         println!("{:?}", (*i, *j));
-    //
-    //         let (i_in_rows, j_in_rows) = row_to_pin.iter().fold(
-    //             (false, false),
-    //             |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
-    //         );
-    //         let (i_in_cols, j_in_cols) = col_to_pin.iter().fold(
-    //             (false, false),
-    //             |(acc_i, acc_j), &pin| (acc_i || (*i == pin), acc_j || (*j == pin))
-    //         );
-    //
-    //         if !i_in_rows && !i_in_cols {
-    //             row_to_pin.push(*i).unwrap();
-    //         }
-    //         if !j_in_rows && !j_in_cols {
-    //             col_to_pin.push(*j).unwrap();
-    //         }
-    //
-    //         assert!(
-    //             !(i_in_cols && j_in_cols) && !(i_in_rows && j_in_rows),
-    //             "Error, some pin is both source and drain at the same time.\n\
-    //         pin: {:?}, key name: {:?}\n\
-    //         source pins so far: {:?}\n\
-    //         drain pins so far: {:?}", (*i, *j), name, row_to_pin, col_to_pin
-    //         );
-    //
-    //         // if i and j are flipped then flip them back
-    //         if i_in_cols || j_in_rows {
-    //             core::mem::swap(i, j);
-    //         }
-    //     }
-    // }
-
     // Sort them. (Syntax is ugly because vector is sorted by using slice cast.)
-    AsMut::<[usize]>::as_mut(&mut row_to_pin).sort_unstable();
-    AsMut::<[usize]>::as_mut(&mut col_to_pin).sort_unstable();
+    AsMut::<[usize]>::as_mut(&mut row_pins).sort_unstable();
+    AsMut::<[usize]>::as_mut(&mut col_pins).sort_unstable();
 
-    // The inverses of `row_to_pin` and `col_to_pin`.
+    return (row_pins, col_pins)
+}
+
+
+fn build_and_print_code_matrix(
+    keys: &mut Vec<(usize, usize, u32, &str), KeysCap>,
+    row_pins: &mut Vec<usize, MatrixCap>,
+    col_pins: &mut Vec<usize, MatrixCap>,
+) -> Vec<Vec<Option<u32>, MatrixCap>, MatrixCap> {
+    // The inverses of `row_pins` and `col_pins`.
     // That is, index corresponds index of pin, and value corresponds the row/column in matrix
-    let mut pin_to_row: Vec<Option<usize>, PinsCap> = full_vec(None, NUM_PINS);
-    let mut pin_to_col: Vec<Option<usize>, PinsCap> = full_vec(None, NUM_PINS);
+    let mut pin_rows: Vec<Option<usize>, PinsCap> = full_vec(None, NUM_PINS);
+    let mut pin_cols: Vec<Option<usize>, PinsCap> = full_vec(None, NUM_PINS);
 
-    for (row, &pin) in row_to_pin.iter().enumerate() {
-        pin_to_row[pin] = Some(row);
+    for (row, &pin) in row_pins.iter().enumerate() {
+        pin_rows[pin] = Some(row);
     }
-    for (col, &pin) in col_to_pin.iter().enumerate() {
-        pin_to_col[pin] = Some(col);
+    for (col, &pin) in col_pins.iter().enumerate() {
+        pin_cols[pin] = Some(col);
     }
 
     assert!(
-        row_to_pin.enumerate().iter().all(|(i, &pin)| i==pin_to_row[pin].unwrap())
-            && col_to_pin.enumerate().iter().all(|(i, &pin)| i==col_to_row[pin].unwrap()),
+        row_pins.iter().enumerate().all(|(i, &pin)| i== pin_rows[pin].unwrap())
+            && col_pins.iter().enumerate().all(|(i, &pin)| i== pin_cols[pin].unwrap()),
         "Internal error! Pin inverse vec is wrong."
     );
     assert!(
-        row_to_pin.iter().all(|&pin| pin_to_col[pin].is_none())
-            && col_to_pin.iter().all(|&pin| pin_to_row[pin].is_none()),
+        row_pins.iter().all(|&pin| pin_cols[pin].is_none())
+            && col_pins.iter().all(|&pin| pin_rows[pin].is_none()),
         "Internal error! Overlap with input and output pins."
     );
 
     let mut code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>
-        = full_vec(full_vec(None, col_to_pin.len()), row_to_pin.len());
+        = full_vec(full_vec(None, col_pins.len()), row_pins.len());
     let mut name_matrix: Vec<Vec<Option<&str>, MatrixCap>, MatrixCap>
-        = full_vec(full_vec(None, col_to_pin.len()), row_to_pin.len());
+        = full_vec(full_vec(None, col_pins.len()), row_pins.len());
     let mut column_max_width: Vec<usize, MatrixCap>  // Width for each column for pretty printing
-        = full_vec(usize::MIN, col_to_pin.len());
+        = full_vec(usize::MIN, col_pins.len());
 
     for &(i, j, code, name) in keys.iter() {
-        let i_idx = pin_to_row[i].unwrap();
-        let j_idx = pin_to_col[j].unwrap();
+        let i_idx = pin_rows[i].unwrap();
+        let j_idx = pin_cols[j].unwrap();
         let code_cell = &mut code_matrix[i_idx][j_idx];
         let name_cell = &mut name_matrix[i_idx][j_idx];
         assert!(name_cell.is_none(), "Clash for same matrix item! ({},{}) {} and {}",
@@ -443,10 +437,8 @@ pub fn figure_out_key_matrix<'a>(
         println!("],");
     }
     println!("];");
-    println!("let rows = {:?};", row_to_pin);
-    println!("let cols = {:?};", col_to_pin);
+    println!("let rows = {:?};", row_pins);
+    println!("let cols = {:?};", col_pins);
     println!("let mat = KeyMatrix::new(pinrow, code_matrix, rows, cols)");
-
-    let mat = KeyMatrix::new(pinrow, code_matrix, row_to_pin, col_to_pin);
-    return mat;
+    return code_matrix;
 }
