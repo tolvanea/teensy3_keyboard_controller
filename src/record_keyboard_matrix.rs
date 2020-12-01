@@ -5,13 +5,12 @@
 //!
 //! TODO add example
 
-use heapless::{Vec}; // fixed capacity `std::Vec`
+use heapless::Vec; // fixed capacity `std::Vec`
 use typenum::{Unsigned, U64 as PinsCap, U256 as KeysCap};  // Maximum capacities
 
-use teensy3::util::{delay};
-use teensy3::pins::{PinMode, Pin, PinRow, NUM_PINS, LED_PIN};
+use teensy3::{util::delay, pins::{PinMode, Pin, PinRow, NUM_PINS, LED_PIN}};
 
-use super::{full_vec};
+use crate::full_vec;
 use crate::process_keys::{KeyMatrix, MatrixCap};
 
 /// IDK is this useless?
@@ -157,7 +156,7 @@ fn query_keys_from_user<'a>(
             for (key_idx, (&key_code, &key_name)) in row_code.iter()
                 .zip(row_name).enumerate() {
                 delay(200);
-                print!("     Press key {}/{}: {}. ", key_idx+1, row_code.len(), key_name);
+                print!("     Press key {}/{}: {} ", key_idx+1, row_code.len(), key_name);
                 let pair = wait_for_key(pinrow);
                 if pair == delete {                                     // Skip key if it is broken
                     println!("Skipping that key.");
@@ -323,7 +322,7 @@ fn separate_pins_to_rows_and_columns(
                     match typ {
                         RowPin => { panic!("Error, some pin is both source and drain."); },
                         ColPin => {},
-                        Neither => { typ = ColPin; println!("{} will be classified as Col", pin);},
+                        Neither => { typ = ColPin; },
                     }
                 }
             }
@@ -332,7 +331,7 @@ fn separate_pins_to_rows_and_columns(
                     match typ {
                         RowPin => {},
                         ColPin => { panic!("Error, some pin is both source and drain."); },
-                        Neither => { typ = RowPin; println!("{} will be classified as Row", pin);},
+                        Neither => { typ = RowPin; },
                     }
                 }
             }
@@ -354,10 +353,6 @@ fn separate_pins_to_rows_and_columns(
                     }
                 },
             };
-            println!(
-                "Number of pins {} overflowed the maximum of key matrix dimension {}.",
-                container.capacity(), container.len()
-            );
             container.push(pin).unwrap_or_else(|_| panic!(
                 "Number of pins {} overflowed the maximum of key matrix dimension {}.",
                 container.capacity(), container.len()
@@ -453,11 +448,12 @@ fn build_and_print_code_matrix(
         println!("],");
     }
     println!(
-        "].iter().map(|v| v.iter().map(|&k| if k==0 {{ None }} else {{ Some(k) }}).collect())"
-    );
-    println!("    .collect();");
-    println!("let rows = Vec::from_slice(&{:?}).unwrap();", row_pins);
-    println!("let cols = Vec::from_slice(&{:?}).unwrap();", col_pins);
-    println!("let mut mat = KeyMatrix::new(pinrow, code_matrix, rows, cols);");
+        "].iter()\n    \
+            .map(|v| v.iter().map(|&k| if k==0 {{ None }} else {{ Some(k) }}).collect())\n    \
+            .collect();\n\
+        let rows = Vec::from_slice(&{:?}).unwrap();\n\
+        let cols = Vec::from_slice(&{:?}).unwrap();\n\
+        let mat = KeyMatrix::new(pinrow, code_matrix, rows, cols);",
+        row_pins, col_pins);
     return code_matrix;
 }
