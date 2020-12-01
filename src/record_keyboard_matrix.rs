@@ -62,18 +62,18 @@ impl KeyIndices {
 ///                 To make typing process a bit easier, the list is divided in parts so that key
 ///                 pressing process is also divided in parts. For example, these parts can
 ///                 correspond to physical rows in key board: (CapsLock, a, s, d, f, ...).
-///                 MAKE SURE THAT THE FIRST LIST IN `key_codes` CONTAINS ONLY ENTER AND SPACE.
+///                 MAKE SURE THAT THE FIRST LIST IN `key_codes` CONTAINS ONLY BACKSPACE AND DELETE.
 ///                 Like so:
 ///                 ```
 ///                 &[
-///                   &[KEY_ENTER, KEY_SPACE],
+///                   &[KEY_BACKSPACE, KEY_DELETE],
 ///                   &[KEY_ESC, KEY_F1, KEY_F2, ...],
 ///                   &[KEY_TILDE, KEY_1, KEY_2, ...],
 ///                   &[KEY_TAB, KEY_Q, KEY_W, ...],
 ///                   ...
 ///                 ]
 ///                 ```
-///                 (Actually first keys need not to be enter and space, but whatever they are,
+///                 (Actually first keys need not to be backspace and delete, but whatever they are,
 ///                 they will be used as error handling keys described above.)
 ///
 /// * `key_names`:  This is similar list to `key_codes`, but contains the names of keys. It's
@@ -102,16 +102,19 @@ fn query_keys_from_user<'a>(
     key_codes: &[&[u32]],
     key_names: &[&[&'a str]]
 ) -> Vec<(usize, usize, u32, &'a str), KeysCap> {
-    assert!(key_codes[0].len() == 2,
-        r#"First list in `key_codes` should contain only Enter and Space.\n\
-        The list may look something like the following:\n\
-        `&[\
-            &[KEY_ENTER, KEY_SPACE], \n\
-            &[KEY_ESC, KEY_F1, KEY_F2, ...], \n\
-            &[KEY_TILDE, KEY_1, KEY_2, ...],\n\
-            &[KEY_TAB, KEY_Q, KEY_W, ...],\n\
-            ...
-         ]`"#);
+    assert_eq!(key_codes[0].len(), 2,
+        "First row in `key_codes` should contain only two keys, e.g. Backspace and Delete, \n\
+        which are used as controls. The key_codes should look something like the following:\n\
+        ```\n\
+        let key_codes = &[\n    \
+            &[KEY_BACKSPACE, KEY_DELETE], \n    \
+            &[KEY_ESC, KEY_F1, KEY_F2, ...], \n    \
+            &[KEY_TILDE, KEY_1, KEY_2, ...],\n    \
+            &[KEY_TAB, KEY_Q, KEY_W, ...],\n    \
+            ...\n\
+         ]\n\
+         ```"
+    );
     assert!(key_codes.len() == key_names.len(), "`key_codes` and `key_names` have different size.");
     let same_size = key_codes.iter().zip(key_names.iter())
         .all(|(&row_code, &row_name)| row_code.len() == row_name.len());
@@ -153,7 +156,7 @@ fn query_keys_from_user<'a>(
         'ask: loop {  // Ask same row of keys until no typos are made.
             for (key_idx, (&key_code, &key_name)) in row_code.iter()
                 .zip(row_name).enumerate() {
-                delay(100);
+                delay(200);
                 print!("     Press key {}/{}: {}. ", key_idx+1, row_code.len(), key_name);
                 let pair = wait_for_key(pinrow);
                 if pair == delete {                                     // Skip key if it is broken
@@ -351,7 +354,14 @@ fn separate_pins_to_rows_and_columns(
                     }
                 },
             };
-            container.push(pin).unwrap();
+            println!(
+                "Number of pins {} overflowed the maximum of key matrix dimension {}.",
+                container.capacity(), container.len()
+            );
+            container.push(pin).unwrap_or_else(|_| panic!(
+                "Number of pins {} overflowed the maximum of key matrix dimension {}.",
+                container.capacity(), container.len()
+            ));
             *unclassified_pin = None;
             continue 'l;
         }
@@ -442,9 +452,12 @@ fn build_and_print_code_matrix(
         }
         println!("],");
     }
-    println!("];");
-    println!("let rows = {:?};", row_pins);
-    println!("let cols = {:?};", col_pins);
-    println!("let mat = KeyMatrix::new(pinrow, code_matrix, rows, cols)");
+    println!(
+        "].iter().map(|v| v.iter().map(|&k| if k==0 {{ None }} else {{ Some(k) }}).collect())"
+    );
+    println!("    .collect();");
+    println!("let rows = Vec::from_slice(&{:?}).unwrap();", row_pins);
+    println!("let cols = Vec::from_slice(&{:?}).unwrap();", col_pins);
+    println!("let mut mat = KeyMatrix::new(pinrow, code_matrix, rows, cols);");
     return code_matrix;
 }
