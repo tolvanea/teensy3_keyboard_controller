@@ -1,5 +1,5 @@
 use heapless::{Vec}; // fixed capacity `std::Vec`
-pub use typenum::{U16 as MatrixCap};  // Maximum capacities
+pub use typenum::{U24 as MatrixCap};  // Maximum capacities
 
 use teensy3::util::{delay};
 use teensy3::pins::{Pin, PinRow, PinMode};
