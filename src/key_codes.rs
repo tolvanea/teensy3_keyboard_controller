@@ -15,7 +15,10 @@ use teensy3::{bindings as b, pins::PinRow};
 //     &[b::KEY_A, b::KEY_S, b::KEY_D],
 // ];
 
-pub const MODIFIERKEY_FN:u32 = 0x8f;
+// Fn key code chosen to be somewhat similar to media key masks in core/teensy3/keylayouts.h
+pub const MODIFIERKEY_FN:u32 = 0xE800;
+
+// TODO media button locations
 
 /// This represents spatial configuration of my keyboard, row by row.
 pub const KEY_CODES: &[&[u32]] = &[
@@ -70,6 +73,27 @@ pub fn ask_key_codes_and_print_them(pinrow: &mut PinRow) -> KeyMatrix {
     return mat
 }
 
+/*
+Packed up version of my key matrix:
+[     0,        0,    0,     0,     0, SHIFT, SHIFT,     0,     0, ],
+[:KEY_7, b::KEY_U, EY_H, KEY_6, KEY_J, KEY_M, KEY_Y,     0, KEY_N, ],
+[:KEY_4, b::KEY_R, EY_G, KEY_5, KEY_F, KEY_V, KEY_T,     0, KEY_B, ],
+[:KEY_0, b::KEY_P, UOTE, MINUS, COLON, SLASH, BRACE,     0, SLASH, ],
+[     0,        0,    0, EY_FN,     0, _CTRL,     0,     0,     0, ],
+[EY_F12,        0,    0, NSERT,     0,     0, T_GUI,     0, RIGHT, ],
+[EY_F11,        0,    0, ELETE,     0,     0,     0,     0, _DOWN, ],
+[EY_END,        0, Y_UP, _HOME,     0,     0,     0,     0, _LEFT, ],
+[E_DOWN,        0,    0, GE_UP,     0,     0,     0,     0,     0, ],
+[EY_F10,        0, Y_F5, EY_F9,     0, ENTER, SPACE,     0, SPACE, ],
+[SCREEN,        0, _ALT,     0,     0,     0,     0,     0, T_ALT, ],
+[:KEY_8, b::KEY_I, Y_F6, EQUAL, KEY_K, COMMA, BRACE,     0,     0, ],
+[:KEY_9, b::KEY_O,    0, EY_F8, KEY_L, ERIOD, EY_F7,     0,     0, ],
+[:KEY_2, b::KEY_W, S_BS, EY_F1, KEY_S, KEY_X, _LOCK,     0,     0, ],
+[:KEY_3, b::KEY_E, Y_F4, EY_F2, KEY_D, KEY_C, EY_F3,     0,     0, ],
+[:KEY_1, b::KEY_Q, _ESC, TILDE, KEY_A, KEY_Z, Y_TAB,     0,     0, ],
+[     0,        0,    0,     0,     0,     0,     0, _CTRL,     0, ],
+ */
+
 /// This function contains key codes that are generated with `ask_key_codes_and_print_them`
 pub fn get_stored_key_codes(pinrow: &mut PinRow) -> KeyMatrix {
     let code_matrix = [
@@ -90,7 +114,6 @@ pub fn get_stored_key_codes(pinrow: &mut PinRow) -> KeyMatrix {
         [          b::KEY_3, b::KEY_E,               b::KEY_F4,      b::KEY_F2,         b::KEY_D,                  b::KEY_C,                 b::KEY_F3,                        0,                        0, ],
         [          b::KEY_1, b::KEY_Q,              b::KEY_ESC,   b::KEY_TILDE,         b::KEY_A,                  b::KEY_Z,                b::KEY_TAB,                        0,                        0, ],
         [                 0,        0,                       0,              0,                0,                         0,                         0, b::MODIFIERKEY_LEFT_CTRL,                        0, ],
-
     ].iter()
         .map(|v| v.iter().map(|&k| if k==0 { None } else { Some(k) }).collect())
         .collect();
