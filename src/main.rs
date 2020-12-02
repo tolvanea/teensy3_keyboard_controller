@@ -18,7 +18,7 @@ use teensy3::util::{delay};
 use teensy3::pins::{Pin, PinRow};
 use teensy3::bindings as b;
 
-use process_keys::{Key, MatrixCap};
+use process_keys::{MatrixCap};
 
 /// Initialise vector filled with some value
 fn full_vec<T, U>(value: T, len: usize) -> Vec<T,U>
@@ -76,33 +76,27 @@ pub extern fn main() {
         let mut keys_pressed: Vec<u8, MatrixCap> = Vec::new();
         let mut modifiers_pressed: u16 = 0;
         let mut fn_pressed: bool = false;
+        // if something is pressed
         if let Some(v) = mat.scan_key_press() {
-            // Something is pressed
             for state in v.into_iter() {
-                match state {
-                    Key::UnPressed => continue,
-                    Key::Pressed(Some(code)) => {
-                        match extract_key_type(code) {
-                            Key::Normal(c) => {
-                                keys_pressed.push(c).unwrap_or(());
-                            },
-                            Key::Modifier(c) => {
-                                modifiers_pressed |= c
-                            },
-                            Key::Fn => {
-                                fn_pressed = true
-                            },
+                if let Some(code) = state {
+                    match extract_key_type(code) {
+                        Key::Normal(c) => {
+                            keys_pressed.push(c).unwrap_or(());
+                        },
+                        Key::Modifier(c) => {
+                            modifiers_pressed |= c;
+                        },
+                        Key::Fn => {
+                            fn_pressed = true;
                         }
-                    },
-                    Key::Pressed(None) => {
-                        println!("Warning! Unknown key in matrix.");
-                    },
-                    Key::TooManyKeysPressed => {
-                        println!("Uh oh! Multible keys pressed! Nothing is registered.");
-                    },
+                    };
+                } else {
+                    println!("Warning! Unknown key in matrix.");
                 }
+                //println!("Uh oh! Multible keys pressed! Nothing is registered.");
             }
-        };
+        }
 
         fn send_modifier_keys(keyboard: &mut KB, modifiers_pressed: u16) {
             unsafe{ keyboard.set_modifier(modifiers_pressed); }
