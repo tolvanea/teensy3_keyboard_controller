@@ -18,7 +18,7 @@ use teensy3::util::{delay};
 use teensy3::pins::{Pin, PinRow};
 use teensy3::bindings as b;
 
-use process_keys::{ScanState, MatrixCap};
+use process_keys::{Key, MatrixCap};
 
 /// Initialise vector filled with some value
 fn full_vec<T, U>(value: T, len: usize) -> Vec<T,U>
@@ -80,8 +80,8 @@ pub extern fn main() {
             // Something is pressed
             for state in v.into_iter() {
                 match state {
-                    ScanState::UnPressed => continue,
-                    ScanState::Pressed(Some(code)) => {
+                    Key::UnPressed => continue,
+                    Key::Pressed(Some(code)) => {
                         match extract_key_type(code) {
                             Key::Normal(c) => {
                                 keys_pressed.push(c).unwrap_or(());
@@ -94,10 +94,10 @@ pub extern fn main() {
                             },
                         }
                     },
-                    ScanState::Pressed(None) => {
+                    Key::Pressed(None) => {
                         println!("Warning! Unknown key in matrix.");
                     },
-                    ScanState::TooManyKeysPressed => {
+                    Key::TooManyKeysPressed => {
                         println!("Uh oh! Multible keys pressed! Nothing is registered.");
                     },
                 }
