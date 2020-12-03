@@ -76,7 +76,6 @@ pub fn ask_key_codes_and_print_them(pinrow: &mut PinRow) -> KeyMatrix {
 /*
 Packed up version of my key matrix:
 
-// e r b ei voi olla yhtä aikaa painettuna?
           0     0         0       0         0 RIGHT_SHIFT _LEFT_SHIFT         0         0
    b::KEY_7 KEY_U  b::KEY_H  :KEY_6  b::KEY_J    b::KEY_M    b::KEY_Y         0  b::KEY_N
    b::KEY_4 KEY_R  b::KEY_G  :KEY_5  b::KEY_F    b::KEY_V    b::KEY_T         0  b::KEY_B

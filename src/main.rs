@@ -172,10 +172,10 @@ pub extern fn main() {
         alive(&mut led);
     }
     println!("Hellouu!");
-    loop {
-        let (i,j) = record_keyboard_matrix::wait_for_key(&mut pinrow);
-        println!("Recorded: {} {}", i, j);
-    }
+    // loop {
+    //     let (i,j) = record_keyboard_matrix::wait_for_key(&mut pinrow);
+    //     println!("Recorded: {} {}", i, j);
+    // }
 
     //let mut mat = custom_key_codes::ask_key_codes_and_print_them(&mut pinrow);
     let mut mat = custom_key_codes::get_stored_key_codes(&mut pinrow);
@@ -208,7 +208,8 @@ pub extern fn main() {
         send_regular_keys(&mut keyboard, &key_slots);
         // send_media_keys(&mut keyboard, &keys_pressed, fn_pressed);
 
-        println!("slots:{:?}, reg:{:?}, mod:{:?}, fn:{:?}", key_slots, regular_keys, modifier_keys, fn_key_slot);
+        //println!("{:?} {:?} ", regular_keys, modifier_keys);
+        //println!("{:?} {:?} ", key_slots, fn_key_slot);
 
         unsafe {
             keyboard.send_now();

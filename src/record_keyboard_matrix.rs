@@ -201,7 +201,7 @@ pub fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
         })
         .collect();
     // Check connections, and set drain pins one by one to source pins.
-    for i in 0..pins.len() {
+    'l: for i in 0..pins.len() {
         // Pins [0..i+1] are source pins "i", and [i+1..NUM_PINS] are drain pins "j"
         let (i_pins, j_pins) = pins.split_at_mut(i+1);
         let pin_i = &mut i_pins[i];
@@ -221,7 +221,8 @@ pub fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
                 } else {
                     println!("Warning! Multiple connections found: {:?} and {:?}. Ignoring both.",
                              connection.unwrap(), (i_real_idx, j_real_idx));
-                    return None;
+                    connection = None;
+                    break 'l;
                 }
             }
         }

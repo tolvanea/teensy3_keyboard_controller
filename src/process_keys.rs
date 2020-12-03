@@ -16,8 +16,6 @@ enum KeyState {
     Pressed(u32),
     /// Key may or may not be pressed. Inner value corresponds to the key code.
     Maybe(u32),
-    /// Unknown key is pressed which is not registered in key matrix
-    Error,
 }
 use KeyState::*;
 
@@ -81,29 +79,44 @@ impl KeyMatrix {
 
     /// Return None if nothing is pressed. Keycode is None if that value is not in matrix
     pub fn scan_key_press(&mut self) -> Option<ShortVec<KeyCode<u32>>> {
+        // `mat` keeps book about what keys may be conflicted with other key presses.
+        // Conflicts may occur if multiple keys are pressed at the same time.
+        // By knowing what presses are "ghost" artifacts, they can be dropped out. Those that
+        // can not be discarded, will be informed to caller that they are uncertain
         let mut mat: ShortVec<ShortVec<KeyState>>
             = full_vec(full_vec(Free, self.col_pins.len()), self.row_pins.len());
+        let mut erroneous_keys: ShortVec<(usize, usize)> = Vec::new();  // *potentially erroneous
         // Performance: Delays takes about 9000 us and conflict detection about 50-100 us
         for (col, drain) in self.col_pins.iter_mut().enumerate() {
             drain.digital_write(false);  // enable drain
             for (row, source) in self.row_pins.iter().enumerate() {
                 let pressed = !source.digital_read();  // check if connected
                 if pressed {
-                    let conflict = scan_for_conflicts(&mut mat, row, col, &self.code_matrix);
                     mat[row][col] = match self.code_matrix[row][col] {
                         Some(c) => {
+                            let conflict = scan_for_conflicts(&mut mat, row, col, true);
                             if conflict { Maybe(c) } else { Pressed(c) }
                         },
-                        None => Error,
+                        None => {
+                            // Can not be yet sure whether error originates from multiple key
+                            // presses or poorly configured key matrix
+                            erroneous_keys.push((row, col)).unwrap_or(());
+                            Free
+                        },
                     }
                 }
             }
             drain.digital_write(true);  // disable drain
             delay(1); // It takes time for pullup pin to charge back to full voltage
         }
+        erroneous_keys.into_iter()
+            .filter(|&(i, j)| !scan_for_conflicts(&mut mat, i, j, false))
+            .for_each(|(i, j)| {
+                println!("Warning! Detected pin connection correspondin to matrix element ({}, {}),\
+                    \nwhich does not have any key assigned in the key matrix.", i, j);
+            });
         let keys: ShortVec<KeyCode<u32>> = mat.iter()
             .flatten()
-            .inspect(|k| if **k==Error { println!("Warning! Unknown key in matrix."); })
             .filter_map(|k| match *k {
                 Pressed(c) => Some(Certain(c)),
                 Maybe(c) => Some(Uncertain(c)),
@@ -122,9 +135,8 @@ fn scan_for_conflicts(
     mat: &mut ShortVec<ShortVec<KeyState>>,
     row: usize,
     col: usize,
-    code_mat: &ShortVec<ShortVec<Option<u32>>>
+    update: bool
 ) -> bool {
-    // TODO be certain if there is no 4th key
     assert!(mat[row][col] == Free);
     let reserved_cols: ShortVec<usize> = mat[row].iter().enumerate()
         .filter(|(_, k)| **k != Free)
@@ -143,32 +155,41 @@ fn scan_for_conflicts(
     } else {
         // Uh oh keyboard can not handle this situation! Now 2+1 corners of
         // some rectangle(s) in matrix are pressed, which would create ghost press
-        // for fourth corner also. So all potentially conflicting keys are also
-        // marked as "Maybe"
-        for &r_row in reserved_rows.iter() {
-            match mat[r_row][col] { //TODO .clone() ?
-                Free => unreachable!(),
-                Pressed(c) => { mat[r_row][col] = Maybe(c) },
-                _ => {},
-            };
-        }
-        for &r_col in reserved_cols.iter() {
-            match mat[row][r_col] { //TODO .clone() ?
-                Free => unreachable!(),
-                Pressed(c) => { mat[row][r_col] = Maybe(c) },
-                _ => {},
-            };
-        }
+        // for fourth corner also. So all potentially conflicting keys are marked
+        // as "Maybe"
+        let mut conflict = false;
         for &r_row in reserved_rows.iter() {
             for &r_col in reserved_cols.iter() {
-                match mat[r_row][r_col] { //TODO .clone() ?
-                    Free => {},  // Even though not yet scanned, it will be written later to `Maybe`
-                    Pressed(c) => { mat[r_row][r_col] = Maybe(c) },
-                    _ => {},
-                };
+                let opposing_corner_is_reserved = mat[r_row][r_col] != Free;
+                if opposing_corner_is_reserved {
+                    conflict = true;
+                    if !update {
+                        return conflict;
+                    }
+                    match mat[r_row][r_col] {
+                        Pressed(c) => {
+                            mat[r_row][r_col] = Maybe(c);
+                        },
+                        _ => {},
+                    };
+                    match mat[r_row][col] {
+                        Pressed(c) => {
+                            mat[r_row][col] = Maybe(c)
+                        },
+                        Free => unreachable!(),
+                        _ => {},
+                    };
+                    match mat[row][r_col] {
+                        Pressed(c) => {
+                            mat[row][r_col] = Maybe(c)
+                        },
+                        Free => unreachable!(),
+                        _ => {},
+                    };
+                }
             }
         }
-        return true;
+        return conflict;
     }
 
 }
