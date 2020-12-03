@@ -18,7 +18,7 @@ use teensy3::util::{delay};
 use teensy3::pins::{Pin, PinRow};
 use teensy3::bindings as b;
 
-use process_keys::{MatrixCap};
+use process_keys::{KeyCode, MatrixCap};
 
 /// Initialise vector filled with some value
 fn full_vec<T, U>(value: T, len: usize) -> Vec<T,U>
@@ -67,36 +67,66 @@ pub extern fn main() {
     //let mut mat = custom_key_codes::ask_key_codes_and_print_them(&mut pinrow);
     let mut mat = custom_key_codes::get_stored_key_codes(&mut pinrow);
 
+    // Key presses from previous cycle
     let mut key_states: [Option<u8>; 6] = [None; 6];
+    let mut modifiers_pressed_old: u16 = 0;
+    let mut fn_pressed_old: bool = false;
+
+
 
     use b::usb_keyboard_class as KB;
     let mut keyboard = unsafe{b::Keyboard};
     for _ in 0..10000 {
         delay(20);
-        let mut keys_pressed: Vec<u8, MatrixCap> = Vec::new();
+        let mut keys_pressed: Vec<KeyCode<u8>, MatrixCap> = Vec::new();
         let mut modifiers_pressed: u16 = 0;
         let mut fn_pressed: bool = false;
         // if something is pressed
         if let Some(v) = mat.scan_key_press() {
             for state in v.into_iter() {
-                if let Some(code) = state {
-                    match extract_key_type(code) {
-                        Key::Normal(c) => {
-                            keys_pressed.push(c).unwrap_or(());
-                        },
-                        Key::Modifier(c) => {
-                            modifiers_pressed |= c;
-                        },
-                        Key::Fn => {
-                            fn_pressed = true;
+                match state {
+                    KeyCode::Certain(code) => {
+                        // Some key is pressed without ambiguities
+                        match extract_key_type(code) {
+                            Key::Normal(c) => {
+                                keys_pressed.push(KeyCode::Certain(c)).unwrap_or(());
+                            },
+                            Key::Modifier(c) => {
+                                modifiers_pressed |= c;
+                            },
+                            Key::Fn => {
+                                fn_pressed = true;
+                            }
                         }
-                    };
-                } else {
-                    println!("Warning! Unknown key in matrix.");
-                }
+                    },
+                    KeyCode::Uncertain(code) => {
+                        // Not sure whether or not key is really pressed. If that key was
+                        // previously pressed, keep pressing, otherwise do not register.
+                        match extract_key_type(code) {
+                            Key::Normal(c) => {
+                                keys_pressed.push(KeyCode::Uncertain(c)).unwrap_or(());
+                            },
+                            Key::Modifier(c) => {
+                                // If modifier key was pressed on previous round
+                                if modifiers_pressed_old == (modifiers_pressed_old | c) {
+                                    modifiers_pressed |= c;
+                                }
+                            },
+                            Key::Fn => {
+                                if fn_pressed_old {
+                                    fn_pressed = true;
+                                }
+                            },
+                        }
+                    },
+                };
+
                 //println!("Uh oh! Multible keys pressed! Nothing is registered.");
             }
         }
+
+        modifiers_pressed_old = modifiers_pressed;
+        fn_pressed_old = fn_pressed;
 
         fn send_modifier_keys(keyboard: &mut KB, modifiers_pressed: u16) {
             unsafe{ keyboard.set_modifier(modifiers_pressed); }
@@ -112,14 +142,16 @@ pub extern fn main() {
         fn send_normal_keys(
             keyboard: &mut KB,
             key_slots: &mut [Option<u8>; 6],
-            keys_pressed: &Vec<u8, MatrixCap>)
+            keys_pressed: &Vec<KeyCode<u8>, MatrixCap>)
         {
-            // Remove released keys, i.e. keys that are in `key_slots` but not in `keys_pressed`
+            // Remove released keys, i.e. keys that are in `key_slots` but not in `keys_pressed`.
+            // If key press is uncertain, keep it in slots.
             key_slots.iter_mut()
-                .filter(|s| s.filter(|s| !keys_pressed.iter().any(|k| k == s)).is_some())
+                .filter(|s| s.filter(|s| !keys_pressed.iter().any(|k| k.to_code() == *s)).is_some())
                 .for_each(|s| *s = None);
             // Add those keys of `keys_pressed` to `key_slots` that are not already there
-            for &k in keys_pressed.iter() {
+            // Also, if key press is uncertain, do not add.
+            for k in keys_pressed.iter().filter_map(|x| x.to_option()) {
                 // Skip keys that are already in `key_slots`
                 if key_slots.iter().any(|s| *s == Some(k)) {
                     continue
