@@ -1,10 +1,9 @@
 use heapless::{Vec}; // fixed capacity `std::Vec`
-pub use typenum::{U24 as MatrixCap};  // Maximum capacities
 
 use teensy3::util::{delay};
 use teensy3::pins::{Pin, PinRow, PinMode};
 
-use super::{full_vec};
+use super::{full_vec, ShortVec};
 
 /// KeyState corresponds to scan state of GPIO, accompanied with some extra information.
 /// If three or more keys are pressed, it is not sure whether all registered key
@@ -32,13 +31,13 @@ pub enum KeyCode<T> {
 }
 use KeyCode::*;
 impl<T> KeyCode<T> {
-    pub fn to_code(self: Self) -> T {
+    pub fn into_inner(self) -> T {
         match self {
             Certain(code) => code,
             Uncertain(code) => code,
         }
     }
-    pub fn to_option(self: Self) -> Option<T> {
+    pub fn into_option(self) -> Option<T> {
         match self {
             Certain(code) => Some(code),
             Uncertain(_) => None,
@@ -50,11 +49,11 @@ impl<T> KeyCode<T> {
 #[derive(Debug)]
 pub struct KeyMatrix {
     /// Key code matrix
-    pub code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>,
+    pub code_matrix: ShortVec<ShortVec<Option<u32>>>,
     /// Voltage source pins
-    pub row_pins: Vec<Pin, MatrixCap>,
+    pub row_pins: ShortVec<Pin>,
     /// Voltage drain pins
-    pub col_pins: Vec<Pin, MatrixCap>,
+    pub col_pins: ShortVec<Pin>,
 }
 
 impl KeyMatrix {
@@ -64,14 +63,14 @@ impl KeyMatrix {
     /// * `cols` Vector, index corresponds column in matrix and, value corresponds GPIO port number
     pub fn new(
         pinrow: &mut PinRow,
-        code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>,
-        rows: Vec<usize, MatrixCap>,
-        cols: Vec<usize, MatrixCap>,
+        code_matrix: ShortVec<ShortVec<Option<u32>>>,
+        rows: ShortVec<usize>,
+        cols: ShortVec<usize>,
     ) -> KeyMatrix {
-        let row_pins: Vec<Pin, MatrixCap> = rows.iter().map(|&i| {
+        let row_pins: ShortVec<Pin> = rows.iter().map(|&i| {
             pinrow.get_pin(i, PinMode::InputPullup)
         }).collect();
-        let col_pins: Vec<Pin, MatrixCap> = cols.iter().map(|&j| {
+        let col_pins: ShortVec<Pin> = cols.iter().map(|&j| {
             let mut p = pinrow.get_pin(j, PinMode::OutputOpenDrain);
             p.digital_write(true);  // By default disable drain
             p
@@ -81,15 +80,16 @@ impl KeyMatrix {
 
 
     /// Return None if nothing is pressed. Keycode is None if that value is not in matrix
-    pub fn scan_key_press(&mut self) -> Option<Vec<KeyCode<u32>, MatrixCap>> {
-        let mut mat: Vec<Vec<KeyState, MatrixCap>, MatrixCap>
+    pub fn scan_key_press(&mut self) -> Option<ShortVec<KeyCode<u32>>> {
+        let mut mat: ShortVec<ShortVec<KeyState>>
             = full_vec(full_vec(Free, self.col_pins.len()), self.row_pins.len());
+        // Performance: Delays takes about 9000 us and conflict detection about 50-100 us
         for (col, drain) in self.col_pins.iter_mut().enumerate() {
             drain.digital_write(false);  // enable drain
             for (row, source) in self.row_pins.iter().enumerate() {
                 let pressed = !source.digital_read();  // check if connected
                 if pressed {
-                    let conflict = scan_for_conflicts(&mut mat, row, col);
+                    let conflict = scan_for_conflicts(&mut mat, row, col, &self.code_matrix);
                     mat[row][col] = match self.code_matrix[row][col] {
                         Some(c) => {
                             if conflict { Maybe(c) } else { Pressed(c) }
@@ -101,7 +101,7 @@ impl KeyMatrix {
             drain.digital_write(true);  // disable drain
             delay(1); // It takes time for pullup pin to charge back to full voltage
         }
-        let keys: Vec<KeyCode<u32>, MatrixCap> = mat.iter()
+        let keys: ShortVec<KeyCode<u32>> = mat.iter()
             .flatten()
             .inspect(|k| if **k==Error { println!("Warning! Unknown key in matrix."); })
             .filter_map(|k| match *k {
@@ -119,16 +119,18 @@ impl KeyMatrix {
 }
 
 fn scan_for_conflicts(
-    mat: &mut Vec<Vec<KeyState, MatrixCap>, MatrixCap>,
+    mat: &mut ShortVec<ShortVec<KeyState>>,
     row: usize,
     col: usize,
+    code_mat: &ShortVec<ShortVec<Option<u32>>>
 ) -> bool {
+    // TODO be certain if there is no 4th key
     assert!(mat[row][col] == Free);
-    let reserved_cols: Vec<usize, MatrixCap> = mat[row].iter().enumerate()
+    let reserved_cols: ShortVec<usize> = mat[row].iter().enumerate()
         .filter(|(_, k)| **k != Free)
         .map(|(r_col, _)| r_col)
         .collect();
-    let mut reserved_rows: Vec<usize, MatrixCap> = Vec::new();
+    let mut reserved_rows: ShortVec<usize> = Vec::new();
     for r_row in 0..mat.len() {
         if mat[r_row][col] != Free {
             reserved_rows.push(r_row).unwrap();

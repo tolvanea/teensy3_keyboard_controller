@@ -10,36 +10,36 @@ use typenum::{Unsigned, U64 as PinsCap, U256 as KeysCap};  // Maximum capacities
 
 use teensy3::{util::delay, pins::{PinMode, Pin, PinRow, NUM_PINS, LED_PIN}};
 
-use crate::full_vec;
-use crate::process_keys::{KeyMatrix, MatrixCap};
+use crate::{full_vec, ShortVec};
+use crate::process_keys::{KeyMatrix};
 
-/// IDK is this useless?
-#[allow(dead_code)]
-struct KeyIndices {
-    /// Index corresponds rows in matrix, and the value is GPIO port number
-    row_pins: Vec<usize, MatrixCap>,
-    /// Index corresponds columns in matrix, and the value is GPIO port number
-    col_pins: Vec<usize, MatrixCap>,
-    /// The inverses of `row_pins`, that is, index corresponds to GPIO port number,
-    /// and value corresponds the row in matrix
-    pin_to_row: Vec<Option<usize>, PinsCap>,
-    /// The inverses of `col_pins`
-    pin_to_col: Vec<Option<usize>, PinsCap>,
-}
-
-impl KeyIndices {
-    /// Fetch the keycode with GPIO pin indices. If there is no keycode for that pair,
-    /// panic. This should function not be used, as there are better alternatives.
-    #[allow(dead_code)]
-    fn get(&self, mat: &KeyMatrix, i: usize, j: usize) -> Option<u32> {
-        let (i, j) = if i < j { (i, j) } else { (j, i) };  // put in order
-        if i < self.pin_to_row.len() || j < self.pin_to_col.len() {
-            mat.code_matrix[self.pin_to_row[i]?][self.pin_to_col[j]?]
-        } else {
-            None  // Out of bounds
-        }
-    }
-}
+// /// IDK is this useless?
+// #[allow(dead_code)]
+// struct KeyIndices {
+//     /// Index corresponds rows in matrix, and the value is GPIO port number
+//     row_pins: ShortVec<usize>,
+//     /// Index corresponds columns in matrix, and the value is GPIO port number
+//     col_pins: ShortVec<usize>,
+//     /// The inverses of `row_pins`, that is, index corresponds to GPIO port number,
+//     /// and value corresponds the row in matrix
+//     pin_to_row: Vec<Option<usize>, PinsCap>,
+//     /// The inverses of `col_pins`
+//     pin_to_col: Vec<Option<usize>, PinsCap>,
+// }
+//
+// impl KeyIndices {
+//     /// Fetch the keycode with GPIO pin indices. If there is no keycode for that pair,
+//     /// panic. This should function not be used, as there are better alternatives.
+//     #[allow(dead_code)]
+//     fn get(&self, mat: &KeyMatrix, i: usize, j: usize) -> Option<u32> {
+//         let (i, j) = if i < j { (i, j) } else { (j, i) };  // put in order
+//         if i < self.pin_to_row.len() || j < self.pin_to_col.len() {
+//             mat.code_matrix[self.pin_to_row[i]?][self.pin_to_col[j]?]
+//         } else {
+//             None  // Out of bounds
+//         }
+//     }
+// }
 
 
 /// Utility tool that finds out key matrix. User presses through every single key through in
@@ -186,7 +186,7 @@ fn query_keys_from_user<'a>(
 /// by iterating ALL possible pin combinations, which is not very efficient, especially if key
 /// matrix is known. So use this only when you do not know how many columns and rows key matrix
 /// contains.
-fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
+pub fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
     // Connected pins. There should be only ONE pin pair connected
     let mut connection: Option<(usize, usize)> = None;
 
@@ -231,7 +231,7 @@ fn scan_key_press(pinrow: &mut PinRow) -> Option<(usize, usize)>{
 }
 
 /// Loops until some key is pressed
-fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
+pub fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
     let pair = loop {
         match scan_key_press(pinrow) {
             Some(pair) => {break pair;},
@@ -250,11 +250,11 @@ fn wait_for_key(pinrow: &mut PinRow) -> (usize, usize) {
 /// done to balance row/column count.
 fn separate_pins_to_rows_and_columns(
     keys: &mut Vec<(usize, usize, u32, &str), KeysCap>
-) -> (Vec<usize, MatrixCap>, Vec<usize, MatrixCap>){
+) -> (ShortVec<usize>, ShortVec<usize>){
     // row_pins: Index is row in matrix and value is pin number
-    let mut row_pins: Vec<usize, MatrixCap> = Vec::new();
+    let mut row_pins: ShortVec<usize> = Vec::new();
     // col_pins: Index is column in matrix and value is pin number
-    let mut col_pins: Vec<usize, MatrixCap> = Vec::new();
+    let mut col_pins: ShortVec<usize> = Vec::new();
 
     let mut pins: Vec<Option<usize>, PinsCap> = Vec::new();
     for &(i, j, _, _) in keys.iter() {
@@ -282,7 +282,7 @@ fn separate_pins_to_rows_and_columns(
         iter.any(|x| x==val)
     }
 
-    let counterparts: Vec<Vec<usize, MatrixCap>, PinsCap> = pins.iter()
+    let counterparts: Vec<ShortVec<usize>, PinsCap> = pins.iter()
         .map(
             |&p| keys.iter()
                 .filter_map(|&(i, j, _, _)|
@@ -392,9 +392,9 @@ fn separate_pins_to_rows_and_columns(
 
 fn build_and_print_code_matrix(
     keys: &mut Vec<(usize, usize, u32, &str), KeysCap>,
-    row_pins: &mut Vec<usize, MatrixCap>,
-    col_pins: &mut Vec<usize, MatrixCap>,
-) -> Vec<Vec<Option<u32>, MatrixCap>, MatrixCap> {
+    row_pins: &mut ShortVec<usize>,
+    col_pins: &mut ShortVec<usize>,
+) -> ShortVec<ShortVec<Option<u32>>> {
     // The inverses of `row_pins` and `col_pins`.
     // That is, index corresponds index of pin, and value corresponds the row/column in matrix
     let mut pin_rows: Vec<Option<usize>, PinsCap> = full_vec(None, NUM_PINS);
@@ -418,11 +418,11 @@ fn build_and_print_code_matrix(
         "Internal error! Overlap with input and output pins."
     );
 
-    let mut code_matrix: Vec<Vec<Option<u32>, MatrixCap>, MatrixCap>
+    let mut code_matrix: ShortVec<ShortVec<Option<u32>>>
         = full_vec(full_vec(None, col_pins.len()), row_pins.len());
-    let mut name_matrix: Vec<Vec<Option<&str>, MatrixCap>, MatrixCap>
+    let mut name_matrix: ShortVec<ShortVec<Option<&str>>>
         = full_vec(full_vec(None, col_pins.len()), row_pins.len());
-    let mut column_max_width: Vec<usize, MatrixCap>  // Width for each column for pretty printing
+    let mut column_max_width: ShortVec<usize>  // Width for each column for pretty printing
         = full_vec(usize::MIN, col_pins.len());
 
     for &(i, j, code, name) in keys.iter() {
