@@ -6,8 +6,6 @@ use teensy3::pins::{Pin, PinRow, PinMode};
 
 use super::{full_vec};
 
-// TODO scan also with sources and drains flipped to get more accuracy.
-
 /// KeyState corresponds to scan state of GPIO, accompanied with some extra information.
 /// If three or more keys are pressed, it is not sure whether all registered key
 /// presses are real or ghost artifacts.
@@ -81,39 +79,11 @@ impl KeyMatrix {
         return KeyMatrix { code_matrix, row_pins, col_pins };
     }
 
-    // fn swap_sources_and_drains(&mut self, changed: bool) {
-    //     let (drain_pins, source_pins) = if changed {
-    //         (&mut self.row_pins, &mut self.col_pins) // swapped order
-    //     } else {
-    //         (&mut self.col_pins, &mut self.row_pins) // original order
-    //     };
-    //         ;
-    //     for drain in drain_pins.iter_mut().enumerate() {
-    //         drain.set_mode(PinMode::OutputOpenDrain);
-    //         drain.digital_write(true);
-    //     }
-    //     for source in source_pins.iter_mut().enumerate() {
-    //         source.set_mode(PinMode::InputPullup);
-    //     }
-    //
-    // }
 
     /// Return None if nothing is pressed. Keycode is None if that value is not in matrix
     pub fn scan_key_press(&mut self) -> Option<Vec<KeyCode<u32>, MatrixCap>> {
-        //#[derive(Copy, Clone)]
-        // enum SourcePin {
-        //     Free,
-        //     Activated(usize),
-        //     OverLap
-        // }
-        //use SourcePin::*;
-        // Index to drain or col that has been arleady activated
         let mut mat: Vec<Vec<KeyState, MatrixCap>, MatrixCap>
             = full_vec(full_vec(Free, self.col_pins.len()), self.row_pins.len());
-        // let mut mat: [[KeyState; MatrixCap::to_usize()]; MatrixCap::to_usize()]
-        //     = [[Free; MatrixCap::to_usize()]; MatrixCap::to_usize()];
-        // let mut active_rows: Vec<SourcePin, MatrixCap> = full_vec(Free, self.row_pins.len());
-        // let mut active_cols: Vec<SourcePin, MatrixCap> = full_vec(Free, self.col_pins.len());
         for (col, drain) in self.col_pins.iter_mut().enumerate() {
             drain.digital_write(false);  // enable drain
             for (row, source) in self.row_pins.iter().enumerate() {
@@ -200,99 +170,3 @@ fn scan_for_conflicts(
     }
 
 }
-
-//     /// Return None if nothing is pressed. Keycode is None if that value is not in matrix
-//     pub fn scan_key_press_too_fucking_complicated(&mut self) -> Option<Vec<Key, MatrixCap>> {
-//         // Row scan
-//         let mut m: Vec<Vec<Key, MatrixCap>, MatrixCap> = full_vec(
-//             full_vec(Key::Free, self.col_pins.len()),
-//             self.row_pins.len(),
-//         );
-//         #[derive(Copy, Clone)]
-//         enum SourcePin {
-//             Free,
-//             Activated((usize, usize,)),
-//             OverLap(u16)
-//         }
-//         use SourcePin::Free;
-//         // Index to drain or col that has been arleady activated
-//         let mut rows_activated: Vec<SourcePin, MatrixCap> = full_vec(Free, self.row_pins.len());
-//         let mut cols_activated: Vec<SourcePin, MatrixCap> = full_vec(Free, self.col_pins.len());
-//         let mut keys: Vec<Key, MatrixCap> = Vec::new();
-//
-//
-//         for iter in 0..2 {
-//             let swapped = iter == 1;
-//             let (drain_pins, source_pins) = if swapped {
-//                 (&mut self.row_pins, &mut self.col_pins) // swapped order
-//             } else {
-//                 (&mut self.col_pins, &mut self.row_pins) // original order
-//             };
-//             let (drains_activated, sources_activated) = if swapped {
-//                 (&mut rows_activated, &mut cols_activated) // swapped order
-//             } else {
-//                 (&mut cols_activated, &mut rows_activated) // original order
-//             };
-//
-//             for (mut i_d, drain) in drain_pins.iter_mut().enumerate() {
-//                 drain.digital_write(false);  // enable drain
-//                 for (mut i_s, source) in source_pins.iter().enumerate() {
-//                     let pressed = !source.digital_read();  // check if connected
-//                     let (row, col) = if swapped { (i_s, i_d) } else {(i_d, i_s)};
-//
-//                     if pressed {
-//                         let code = self.code_matrix[row][col];
-//                         // Test that if key scan row already been activated
-//
-//                         match m[row][col] {
-//                             Key::Free => {
-//                                 assert!(!swapped);
-//                                 // TODO borrow checker
-//                                 let source_state = sources_activated[i_s];
-//                                 match source_state {
-//                                     SourcePin::Free => {
-//                                         // Ok, everything fine so far
-//                                         m[row][col] = Key::Pressed(code);
-//                                         sources_activated[i_s] = SourcePin::Activated((row, col));
-//                                     },
-//                                     SourcePin::Activated((prev_row, prev_col,)) => {
-//                                         // Uh oh! Corresponding drain was already activated before!
-//                                         sources_activated[i_s] = SourcePin::OverLap(2);
-//                                         m[prev_row][prev_col] = Key::Overlap;
-//                                         m[row][col] = Key::Overlap;
-//                                     },
-//                                     SourcePin::OverLap(count) => {
-//                                         sources_activated[i_s] = SourcePin::OverLap(count + 1)
-//                                     },
-//                                 }
-//                             },
-//                             Key::Pressed(_) => {
-//                                 assert!(swapped);
-//                             },
-//                             Key::Overlap => {
-//                                 assert!(swapped);
-//                                 if Some drains_activated[i_d]
-//                                 if let Some((prev_row, prev_col)) = sources_activated[i_s] {
-//                                     // Uh oh! Corresponding drain was already activated before!
-//                                     m[prev_row][prev_col] = Key::Overlap;
-//                                     m[row][col] = Key::Overlap;
-//                                 } else {
-//                                     // Ok, everything fine so far
-//                                     m[row][col] = Key::Pressed(code);
-//                                 }
-//                             },
-//                         }
-//                     }
-//                 }
-//                 drain.digital_write(true);  // disable drain
-//                 delay(1); // It takes time for pullup pin to charge back to full voltage
-//             }
-//             self.swap_sources_and_drains(swapped);
-//         }
-//         if v.iter().all(|state| *state == Key::Free) {
-//             return None;
-//         } else {
-//             return Some(v);
-//         }
-//     }
-// }
