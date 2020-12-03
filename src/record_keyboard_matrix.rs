@@ -10,37 +10,8 @@ use typenum::{Unsigned, U64 as PinsCap, U256 as KeysCap};  // Maximum capacities
 
 use teensy3::{util::delay, pins::{PinMode, Pin, PinRow, NUM_PINS, LED_PIN}};
 
-use crate::{full_vec, ShortVec};
-use crate::process_keys::{KeyMatrix};
-
-// /// IDK is this useless?
-// #[allow(dead_code)]
-// struct KeyIndices {
-//     /// Index corresponds rows in matrix, and the value is GPIO port number
-//     row_pins: ShortVec<usize>,
-//     /// Index corresponds columns in matrix, and the value is GPIO port number
-//     col_pins: ShortVec<usize>,
-//     /// The inverses of `row_pins`, that is, index corresponds to GPIO port number,
-//     /// and value corresponds the row in matrix
-//     pin_to_row: Vec<Option<usize>, PinsCap>,
-//     /// The inverses of `col_pins`
-//     pin_to_col: Vec<Option<usize>, PinsCap>,
-// }
-//
-// impl KeyIndices {
-//     /// Fetch the keycode with GPIO pin indices. If there is no keycode for that pair,
-//     /// panic. This should function not be used, as there are better alternatives.
-//     #[allow(dead_code)]
-//     fn get(&self, mat: &KeyMatrix, i: usize, j: usize) -> Option<u32> {
-//         let (i, j) = if i < j { (i, j) } else { (j, i) };  // put in order
-//         if i < self.pin_to_row.len() || j < self.pin_to_col.len() {
-//             mat.code_matrix[self.pin_to_row[i]?][self.pin_to_col[j]?]
-//         } else {
-//             None  // Out of bounds
-//         }
-//     }
-// }
-
+use crate::{full_vec, ShortVec, contains};
+use crate::process_keys::{KeyMatrix, ExtraKeyInfo};
 
 /// Utility tool that finds out key matrix. User presses through every single key through in
 /// keyboard. Keys 'Backspace' and 'Delete' are used to fix typos and other problems in typing
@@ -86,13 +57,14 @@ use crate::process_keys::{KeyMatrix};
 pub fn figure_out_key_matrix<'a>(
     pinrow: &mut PinRow,
     key_codes: &[&[u32]],
-    key_names: &[&[&'a str]]
+    key_names: &[&[&'a str]],
+    info: ExtraKeyInfo,
 ) -> KeyMatrix
 {
     let mut keys = query_keys_from_user(pinrow, key_codes, key_names);
     let (mut row_pins, mut col_pins) = separate_pins_to_rows_and_columns(&mut keys);
     let code_matrix = build_and_print_code_matrix(&mut keys, &mut row_pins, &mut col_pins);
-    let mat = KeyMatrix::new(pinrow, code_matrix, row_pins, col_pins);
+    let mat = KeyMatrix::new(pinrow, code_matrix, row_pins, col_pins, info);
     return mat;
 }
 
@@ -278,10 +250,6 @@ fn separate_pins_to_rows_and_columns(
 
     // Classify one pin as row pin, and let the rest be determined by that.
     row_pins.push(pins.pop().unwrap().unwrap()).unwrap();
-
-    fn contains<T: PartialEq, I: Iterator<Item=T>>(mut iter: I, val: T) -> bool {
-        iter.any(|x| x==val)
-    }
 
     let counterparts: Vec<ShortVec<usize>, PinsCap> = pins.iter()
         .map(

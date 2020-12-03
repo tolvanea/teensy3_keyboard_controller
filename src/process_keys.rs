@@ -48,10 +48,25 @@ impl<T> KeyCode<T> {
 pub struct KeyMatrix {
     /// Key code matrix
     pub code_matrix: ShortVec<ShortVec<Option<u32>>>,
-    /// Voltage source pins
+    /// Voltage source pins. Index corresponds row index in matrix.
     pub row_pins: ShortVec<Pin>,
-    /// Voltage drain pins
+    /// Voltage drain pins. Index corresponds column index in matrix.
     pub col_pins: ShortVec<Pin>,
+    /// Other less important fields in Key matrix
+    pub info: ExtraKeyInfo,
+}
+
+#[derive(Debug)]
+/// Some extra information about key codes. This is less essential field of Key matrix
+pub struct ExtraKeyInfo {
+    /// Fn key code
+    pub fn_key: u32,
+    /// Media key bindings when Fn is pressed
+    pub media_key_bindings: ShortVec<(u32, u32)>,
+    /// Byte masks for regular keys. The byte mask is second byte of key code (u32)
+    pub regular_key_mask: u8,
+    /// Byte masks for modifier keys.
+    pub modifier_key_mask: u8,
 }
 
 impl KeyMatrix {
@@ -64,6 +79,7 @@ impl KeyMatrix {
         code_matrix: ShortVec<ShortVec<Option<u32>>>,
         rows: ShortVec<usize>,
         cols: ShortVec<usize>,
+        info: ExtraKeyInfo,
     ) -> KeyMatrix {
         let row_pins: ShortVec<Pin> = rows.iter().map(|&i| {
             pinrow.get_pin(i, PinMode::InputPullup)
@@ -73,7 +89,7 @@ impl KeyMatrix {
             p.digital_write(true);  // By default disable drain
             p
         }).collect();
-        return KeyMatrix { code_matrix, row_pins, col_pins };
+        return KeyMatrix { code_matrix, row_pins, col_pins, info};
     }
 
 
@@ -166,12 +182,10 @@ fn scan_for_conflicts(
                     if !update {
                         return conflict;
                     }
-                    match mat[r_row][r_col] {
-                        Pressed(c) => {
-                            mat[r_row][r_col] = Maybe(c);
-                        },
-                        _ => {},
-                    };
+                    if let Pressed(c) = mat[r_row][r_col] {
+                        mat[r_row][r_col] = Maybe(c);
+                    }
+                    // TODO remove unreachable?
                     match mat[r_row][col] {
                         Pressed(c) => {
                             mat[r_row][col] = Maybe(c)
