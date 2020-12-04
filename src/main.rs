@@ -66,11 +66,11 @@ fn extract_key_type(key_code: u32, info: &ExtraKeyInfo) -> Key {
     let bytes = key_code.to_le_bytes();
     let fn_mask: u8 = info.fn_key.to_le_bytes()[1];
     match bytes[1] {
-        0xF0 => Key::Normal(bytes[0]),
-        0xE0 => Key::Modifier(u16::from_le_bytes([bytes[0], bytes[1]])),
+        m if m == info.regular_key_mask => Key::Normal(bytes[0]),
+        m if m == info.modifier_key_mask => Key::Modifier(key_code as u16),
         0xE2 => panic!("System keys not supported here."),
         0xE4 => panic!("Media keys not supported here."),
-        m if m == fn_mask => Key::Fn,
+        m if m==fn_mask => Key::Fn,
         _ => panic!("Dafuq is that key?"),
     }
 }
@@ -254,8 +254,13 @@ pub extern fn main() {
         wait(rescan_interval, &mut prev_loop);
 
         let scan = mat.scan_key_press();
-        let (regular_keys, modifier_keys, fn_key)
-            = categorize_key_presses(scan, &key_slots_prev, modifier_slots_prev, fn_key_prev, &mat.info);
+        let (regular_keys, modifier_keys, fn_key) = categorize_key_presses(
+            scan,
+            &key_slots_prev,
+            modifier_slots_prev,
+            fn_key_prev,
+            &mat.info
+        );
 
         let key_slots = update_slots(&key_slots_prev, &regular_keys);
         let modifier_slots = modifier_keys.iter().fold(0, |acc, k| k.into_inner() | acc);

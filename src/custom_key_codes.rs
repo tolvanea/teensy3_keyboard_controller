@@ -1,3 +1,6 @@
+//! This file contains custom key layout configuration of my keyboard.
+//! This is also good place to see how key matrix recording is done in practise.
+
 use heapless::Vec;
 use crate::record_keyboard_matrix::figure_out_key_matrix;
 use crate::process_keys::{KeyMatrix, ExtraKeyInfo};
@@ -90,12 +93,14 @@ pub fn get_stored_key_codes(pinrow: &mut PinRow) -> KeyMatrix {
 }
 
 
+/// This function is my custom configuration, for some small details about key codes.
+/// This contains information about Fn key, media keys, and the byte masks of key codes.
+/// The only thing that should need configuration is `media_key_bindings`. All others
+/// are effectively the same for everybody.
 pub fn extra_information_about_key_codes() -> ExtraKeyInfo {
-    // This function is my custom hand written configuration, for some small details about key
-    // codes. This contains information about Fn key, media keys, and the byte masks of key codes.
 
-    // Media key bindings when fn is pressed
-    // That is, if "Fn + F2" is pressed, then volume is decreased
+    // Media key bindings when fn is pressed. That is, if "Fn + F2" is pressed, then volume
+    // is decreased. This is the only thing one should need to configure in this function!
     let media_key_bindings: ShortVec<(u32, u32)> = [
         (b::KEY_F1, b::KEY_MEDIA_MUTE),
         (b::KEY_F2, b::KEY_MEDIA_VOLUME_DEC),
@@ -126,7 +131,7 @@ pub fn extra_information_about_key_codes() -> ExtraKeyInfo {
 }
 
 /*
-Packed up version of my key matrix:
+For no specific reason, here's packed up version of my key matrix above:
 
           0     0         0       0         0 RIGHT_SHIFT _LEFT_SHIFT         0         0
    b::KEY_7 KEY_U  b::KEY_H  :KEY_6  b::KEY_J    b::KEY_M    b::KEY_Y         0  b::KEY_N

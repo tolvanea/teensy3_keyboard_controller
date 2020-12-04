@@ -1,3 +1,11 @@
+//! This file contains methods to reading GPIO pin connections to valid key presses.
+//! This does not contain any logic separating modifier keys from regular keys.
+//! Main function is `scan_key_press` which returns list of currently pressed keys.
+//!
+//! Quite a lot of logic is implemented for that case that multiple keys are pressed.
+//! Naive implementation would register ghost presses, but this does not. Also this
+//! implementation is quite sophisticated, and it detects all keys that are possible
+//! to be deteceted.
 use heapless::{Vec}; // fixed capacity `std::Vec`
 
 use teensy3::util::{delay};
@@ -43,7 +51,8 @@ impl<T> KeyCode<T> {
     }
 }
 
-/// Translate GPIO pin port connection to key codes that will be send over usb
+/// This is one central object of whole project. It is used to read GPIO pin connections and to
+/// output a list of pressed keys. The central function for that purpose is `scan_key_press`.
 #[derive(Debug)]
 pub struct KeyMatrix {
     /// Key code matrix
@@ -57,7 +66,7 @@ pub struct KeyMatrix {
 }
 
 #[derive(Debug)]
-/// Some extra information about key codes. This is less essential field of Key matrix
+/// Some extra information about key codes. This is not-so-interesting field of `KeyMatrix`
 pub struct ExtraKeyInfo {
     /// Fn key code
     pub fn_key: u32,
@@ -70,10 +79,12 @@ pub struct ExtraKeyInfo {
 }
 
 impl KeyMatrix {
+    /// It's highly recommended to create key matrix as in `custom_key_codes::get_stored_key_codes`.
     /// # Arguments
     /// * `mat`  Matrix of key codes
     /// * `rows` Vector, index corresponds row in matrix, and value corresponds GPIO port number
     /// * `cols` Vector, index corresponds column in matrix and, value corresponds GPIO port number
+    /// * `info` Information about key codes
     pub fn new(
         pinrow: &mut PinRow,
         code_matrix: ShortVec<ShortVec<Option<u32>>>,
@@ -93,7 +104,8 @@ impl KeyMatrix {
     }
 
 
-    /// Return None if nothing is pressed. Keycode is None if that value is not in matrix
+    /// Scan key matrix GPIO connections, and return list of currently pressed keys.
+    /// Return None if nothing is pressed.
     pub fn scan_key_press(&mut self) -> Option<ShortVec<KeyCode<u32>>> {
         // `mat` keeps book about what keys may be conflicted with other key presses.
         // Conflicts may occur if multiple keys are pressed at the same time.
@@ -113,9 +125,10 @@ impl KeyMatrix {
                             let conflict = scan_for_conflicts(&mut mat, row, col, true);
                             if conflict { Maybe(c) } else { Pressed(c) }
                         },
-                        None => {
-                            // Can not be yet sure whether error originates from multiple key
-                            // presses or poorly configured key matrix
+                        None => {  // Uh oh, such connection should not exists for any key.
+                            // One can not be yet sure whether error originates from multiple key
+                            // presses or poorly configured key matrix. That's why `erroneous_keys`
+                            // is checked later.
                             erroneous_keys.push((row, col)).unwrap_or(());
                             Free
                         },
@@ -172,7 +185,9 @@ fn scan_for_conflicts(
         // Uh oh keyboard can not handle this situation! Now 2+1 corners of
         // some rectangle(s) in matrix are pressed, which would create ghost press
         // for fourth corner also. So all potentially conflicting keys are marked
-        // as "Maybe"
+        // as "Maybe". However if opposing corner is has not valid key, then we know
+        // that it can not be pressed. In that case these three keys can be pressed
+        // without ambiguities.
         let mut conflict = false;
         for &r_row in reserved_rows.iter() {
             for &r_col in reserved_cols.iter() {
