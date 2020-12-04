@@ -12,7 +12,6 @@ mod custom_key_codes;
 mod record_keyboard_matrix;
 pub use typenum::{U24 as MatrixCap};  // Maximum capacities
 
-
 use heapless::{Vec, ArrayLength};  // fixed capacity `std::Vec`
 
 use teensy3::util::{delay, MillisTimer};
@@ -25,7 +24,7 @@ use core::convert::TryInto;
 
 type ShortVec<T> = Vec<T, MatrixCap>;
 
-/// Initialise vector filled with some value
+/// Shorthand function to initialise new vector filled with some value
 fn full_vec<T, U>(value: T, len: usize) -> Vec<T,U>
 where T: Clone, U: ArrayLength<T>
 {
@@ -34,8 +33,19 @@ where T: Clone, U: ArrayLength<T>
     return a;
 }
 
-fn contains<T: PartialEq, I: Iterator<Item=T>>(mut iter: I, val: T) -> bool {
-    iter.any(|x| x==val)
+/// Shorthand trait so that it is easy to check if iterator contains some value
+/// # Examples
+/// ```
+/// assert!([1,2,3].iter().contains(&3));
+/// assert!(![1,2,3].iter().contains(&4));
+/// ```
+pub trait Contains<T: PartialEq>: Iterator<Item=T> {
+    fn contains(self, val: T) -> bool;
+}
+impl<I: Iterator<Item=T>, T: PartialEq> Contains<T> for I {
+    fn contains(mut self, val: T) -> bool{
+        self.any(|x| x == val)
+    }
 }
 
 fn setup() -> PinRow {
@@ -142,7 +152,7 @@ fn update_slots(
     // Also, if key press is uncertain, do not add.
     for k in regular_keys.iter().filter_map(|x| x.into_option()) {
         // Skip keys that are already in `key_slots`
-        if key_slots_new.iter().any(|s| *s == Some(k)) {
+        if key_slots_new.iter().contains(&Some(k)) {
             continue
         }
         // add them to first free `None` spot
@@ -182,7 +192,7 @@ fn send_media_keys(
     let keys_old = key_slots_prev.iter().filter_map(|k| *k);
     for k in keys.clone() {
         // If this key was not pressed on last time, prepare to press down corresponding media key
-        if !contains(keys_old.clone(), k) {
+        if !keys_old.clone().contains(k) {
             for &(regular_key, media_key) in info.media_key_bindings.iter() {
                 if regular_key == ((k as u32) | 0xF000) {
                     unsafe{ keyboard.press(media_key.try_into().unwrap()); }
@@ -192,7 +202,7 @@ fn send_media_keys(
     }
     for k_old in keys_old {
         // If this key has disappeared from current list, prepare to release corresponding media key
-        if !contains(keys.clone(), k_old) {
+        if !keys.clone().contains(k_old) {
             for &(regular_key, media_key) in info.media_key_bindings.iter() {
                 if regular_key == ((k_old as u32) | 0xF000) {
                     unsafe{ keyboard.release(media_key.try_into().unwrap()); }

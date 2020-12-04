@@ -149,14 +149,4 @@ PRINTSCREEN     0  LEFT_ALT       0         0           0           0         0 
 */
 
 
-// pub const KEY_NAMES_SHORT_TEST: &[&[&str]] = &[
-//     &["b::KEY_ENTER", "b::KEY_SPACE"],
-//     &["b::KEY_Q", "b::KEY_W", "b::KEY_R"],
-//     &["b::KEY_A", "b::KEY_S", "b::KEY_D"],
-// ];
-//
-// pub const KEY_CODES_SHORT_TEST: &[&[u32]] = &[
-//     &[b::KEY_ENTER, b::KEY_SPACE],
-//     &[b::KEY_Q, b::KEY_W, b::KEY_R],
-//     &[b::KEY_A, b::KEY_S, b::KEY_D],
-// ];
+

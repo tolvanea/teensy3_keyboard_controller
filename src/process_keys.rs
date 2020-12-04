@@ -185,21 +185,12 @@ fn scan_for_conflicts(
                     if let Pressed(c) = mat[r_row][r_col] {
                         mat[r_row][r_col] = Maybe(c);
                     }
-                    // TODO remove unreachable?
-                    match mat[r_row][col] {
-                        Pressed(c) => {
-                            mat[r_row][col] = Maybe(c)
-                        },
-                        Free => unreachable!(),
-                        _ => {},
-                    };
-                    match mat[row][r_col] {
-                        Pressed(c) => {
-                            mat[row][r_col] = Maybe(c)
-                        },
-                        Free => unreachable!(),
-                        _ => {},
-                    };
+                    if let Pressed(c) = mat[r_row][col] {
+                        mat[r_row][col] = Maybe(c);
+                    }
+                    if let Pressed(c) = mat[row][r_col] {
+                        mat[row][r_col] = Maybe(c);
+                    }
                 }
             }
         }
