@@ -4,7 +4,7 @@ This file lists project criteria for course COMP.530-01 Bare Metal Rust.
 1. **The general idea of the application.**
     * Make usb keyboard from laptop's keyboard part.
     * This project requires:
-        * Microcontroller model that haves USB HID libraries
+        * Microcontroller that haves USB HID libraries
         * Keyboard spare part from laptop
         * Flat cable connector board, which connects to GPIO pins to keyboard
 
@@ -14,20 +14,23 @@ This file lists project criteria for course COMP.530-01 Bare Metal Rust.
         * Also, different keyboards have different connections, so each person has to figure out how pins in flat cable correspond to keys in keyboard.
         * Keyboard firmware can be shared between participants.
     * USB library considerations
-        * Using existing rust usb-libraries is easy. However, currently only two microcontrollers have this support. (One of them is STM32 bluepill.)
+        * If USB libraries exists for rust, then project is easy. However, currently only two microcontrollers have this support, where one of them is STM32 bluepill. Being more precise, USB "HID" libraries are required for microcontroller to pretend keyboard.
         * Generating bindings to c/c++ is harder, but should be valid option for any microcontroller. (e.g. for Teensy and Longan nano)
-        * Modifying existing rust usb-libraries to add device support is probably outside the scope of this course. (BTW, Longan nano is very similar to STM32 bluepill)
+        * Modifying existing rust usb-libraries to add support for custom device is probably outside the scope of this course. (BTW, Longan nano is very similar to STM32 bluepill)
     
 3. **Tentative list of features per credit (1 cr = 27 hours / person), and a tentative span of study credits per participant per list of features (1-3 cr per student). The point is to give an idea of how many study credits a person can earn by participating in this project. This requirement is set by university policy.**
     * USB-libraries, choose one:
         * 0cr: Using existing rust library
-        * 1cr: Generating bindings to existing c/c++ library. It would be good to publish this.
-        * 3-5cr: Modifying existing rust library to add compatibility for own device. It is mandatory to publish it if this is achieved.
+        * 1cr: Generating bindings to existing c/c++ library. It would be good to publish the bindings if this is chosen.
+        * 3-5cr: Modifying existing rust library to add compatibility for own custom device. It is absolutely mandatory to publish it if this is achieved.
     * 0cr: connecting keyboard to microcontroller
+        * **Edit afterwards: This may not be easy if person does not have proper soldering equipment nor good soldering skills. Cough cough.**
     * 1-2cr: Writing keyboard firmware
+        * **Edit afterwards: Naive keyboard controller implementation is easy, but more sophisticated ones requires quite some thought and pondering. 1-2 credits is quite good for that.**
       
 4. **A brief assessment of project difficulty.**
     * Depends on library support, could be easy, could be hard. I expect it to be from easy to medium:
+    * **Edit afterwards: This is a challenging medium.**
 
 5. **Availability and location of related physical devices**
     * Microcontroller: buy online
