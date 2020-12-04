@@ -171,10 +171,10 @@ fn update_slots(
     return key_slots_new;
 }
 
-fn send_modifier_keys(keyboard: &mut KBoard, modifier_slots: u16) {
+fn set_modifier_keys(keyboard: &mut KBoard, modifier_slots: u16) {
     unsafe{ keyboard.set_modifier(modifier_slots); }
 }
-fn send_regular_keys(keyboard: &mut KBoard, key_slots: &[Option<u8>; 6]) {
+fn set_regular_keys(keyboard: &mut KBoard, key_slots: &[Option<u8>; 6]) {
     unsafe {
         keyboard.set_key1(key_slots[0].unwrap_or(0));
         keyboard.set_key2(key_slots[1].unwrap_or(0));
@@ -186,7 +186,7 @@ fn send_regular_keys(keyboard: &mut KBoard, key_slots: &[Option<u8>; 6]) {
 }
 /// Send Fn and media keys (volmue up and down)
 /// Media keys does not have u8 key codes, so their presses must be emulated on higher level
-fn send_media_keys(
+fn set_media_keys(
     keyboard: &mut KBoard,
     key_slots_fn: &[Option<u8>; 6],
     key_slots_fn_prev: &[Option<u8>; 6],
@@ -199,7 +199,6 @@ fn send_media_keys(
         if !keys.clone().contains(k_old) {
             for &(regular_key, media_key) in info.media_key_bindings.iter() {
                 if regular_key == ((k_old as u32) | 0xF000) {
-                    println!("Release {:?}", media_key);
                     unsafe{ keyboard.release(media_key as u16); }
                 }
             }
@@ -210,7 +209,6 @@ fn send_media_keys(
         if !keys_old.clone().contains(k) {
             for &(regular_key, media_key) in info.media_key_bindings.iter() {
                 if regular_key == ((k as u32) | 0xF000) {
-                    println!("Press {:?}", media_key);
                     unsafe{ keyboard.press(media_key as u16); }
                 }
             }
@@ -259,15 +257,18 @@ pub extern fn main() {
     let mut modifier_slots_prev: u16 = 0;
     let mut fn_key_prev: bool = false;
 
-    // Note that due to GPIO pin settlement (sleep 1ms) best scan rate is about 10ms.
-    let rescan_interval = 20;  // milliseconds
+    // Note that due to GPIO pin settlement (sleep 1ms) best possible scan rate is about 10ms.
+    let rescan_interval = 10;  // milliseconds
     let mut prev_loop = MillisTimer::new();
 
     let mut keyboard = unsafe{b::Keyboard};
     loop {
         wait(rescan_interval, &mut prev_loop);
-
         let scan = mat.scan_key_press();
+        // Proceed to send key states only if something is pressed
+        if scan.is_none() && key_slots_prev.iter().all(|s| s.is_none()) {
+            continue;
+        }
         let (regular_keys, modifier_keys, fn_key) = categorize_key_presses(
             scan,
             &key_slots_prev,
@@ -280,18 +281,26 @@ pub extern fn main() {
         let key_slots = update_slots(&key_slots_prev, &regular_keys, fn_key);
         let key_slots_fn = update_slots(&key_slots_fn_prev, &regular_keys, !fn_key);
 
-        send_regular_keys(&mut keyboard, &key_slots);
-        send_modifier_keys(&mut keyboard, modifier_slots);
-        send_media_keys(&mut keyboard, &key_slots_fn, &key_slots_fn_prev, &mat.info);
+        // Proceed to send key states only if some key states are changed
+        if (modifier_slots == modifier_slots_prev)
+            && (key_slots == key_slots_prev)
+            && (key_slots_fn == key_slots_fn_prev)
+        {
+            continue;
+        };
+
+        set_modifier_keys(&mut keyboard, modifier_slots);
+        set_regular_keys(&mut keyboard, &key_slots);
+        set_media_keys(&mut keyboard, &key_slots_fn, &key_slots_fn_prev, &mat.info);
 
         unsafe {
             keyboard.send_now();
         }
 
-        key_slots_prev = key_slots;
         modifier_slots_prev = modifier_slots;
+        key_slots_prev = key_slots;
+        key_slots_fn_prev = key_slots_fn;
         fn_key_prev = fn_key;
-        key_slots_fn_prev = key_slots_fn
     }
 
 }
