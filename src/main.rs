@@ -1,25 +1,24 @@
 #![no_std]
 #![no_main]
-
 #![deny(unused_must_use)]
 #![allow(clippy::needless_return)]
 
 #[macro_use]
 extern crate teensy3;
 
-mod process_keys;
 mod custom_key_codes;
+mod process_keys;
 mod record_keyboard_matrix;
-pub use typenum::{U24 as MatrixCap};  // Maximum capacities
+pub use typenum::U24 as MatrixCap; // Maximum capacities
 
-use heapless::{Vec, ArrayLength};  // fixed capacity `std::Vec`
+use heapless::{ArrayLength, Vec}; // fixed capacity `std::Vec`
 
-use teensy3::util::{delay, MillisTimer};
-use teensy3::pins::{Pin, PinRow};
-use teensy3::bindings as b;
 use b::usb_keyboard_class as KBoard;
+use teensy3::bindings as b;
+use teensy3::pins::{Pin, PinRow};
+use teensy3::util::{delay, MillisTimer};
 
-use process_keys::{KeyCode, ExtraKeyInfo};
+use process_keys::{ExtraKeyInfo, KeyCode};
 
 type ShortVec<T> = Vec<T, MatrixCap>;
 
@@ -42,14 +41,14 @@ pub trait Contains<T: PartialEq>: Iterator<Item=T> {
     fn contains(self, val: T) -> bool;
 }
 impl<I: Iterator<Item=T>, T: PartialEq> Contains<T> for I {
-    fn contains(mut self, val: T) -> bool{
+    fn contains(mut self, val: T) -> bool {
         self.any(|x| x == val)
     }
 }
 
 fn setup() -> PinRow {
     // It's unsafe because caller verifies that it's called only once
-    unsafe{ PinRow::new_once()}
+    unsafe { PinRow::new_once() }
 }
 
 enum Key {
@@ -69,7 +68,7 @@ fn extract_key_type(key_code: u32, info: &ExtraKeyInfo) -> Key {
         m if m == info.modifier_key_mask => Key::Modifier(key_code as u16),
         0xE2 => panic!("System keys not supported here."),
         0xE4 => panic!("Media keys not supported here."),
-        m if m==fn_mask => Key::Fn,
+        m if m == fn_mask => Key::Fn,
         _ => panic!("Dafuq is that key?"),
     }
 }
@@ -98,15 +97,15 @@ fn categorize_key_presses(
                 match extract_key_type(code, info) {
                     Key::Normal(c) => {
                         regular_keys.push(KeyCode::Certain(c)).unwrap_or(());
-                    },
+                    }
                     Key::Modifier(c) => {
-                        modifier_keys.push(KeyCode::Certain(c)).unwrap_or(())
-                    },
+                        modifier_keys.push(KeyCode::Certain(c)).unwrap_or(());
+                    }
                     Key::Fn => {
                         fn_key = true;
                     }
                 }
-            },
+            }
             KeyCode::Uncertain(code) => {
                 // Now can not be sure whether or not key is really pressed. If key was
                 // previously pressed, it is kept pressing, otherwise it is not registered.
@@ -116,23 +115,23 @@ fn categorize_key_presses(
                         if key_slots.iter().any(|s| s.filter(|s| *s == c).is_some()) {
                             regular_keys.push(KeyCode::Uncertain(c)).unwrap_or(());
                         }
-                    },
+                    }
                     Key::Modifier(c) => {
                         // Add only if modifier key was pressed on previous round
                         if modifiers_pressed_old == (modifiers_pressed_old | c) {
                             modifier_keys.push(KeyCode::Uncertain(c)).unwrap_or(())
                         }
-                    },
+                    }
                     Key::Fn => {
                         if fn_pressed_old {
                             fn_key = true;
                         }
-                    },
+                    }
                 }
-            },
+            }
         };
     }
-    return (regular_keys, modifier_keys, fn_key)
+    return (regular_keys, modifier_keys, fn_key);
 }
 
 /// Write pressed keys to 6 slots that are send over usb.
@@ -142,7 +141,8 @@ fn update_slots(
     regular_keys: &ShortVec<KeyCode<u8>>,
     remove_only: bool,
 ) -> [Option<u8>; 6] {
-    let mut key_slots_new = *key_slots_prev;  // Copy
+    // Copy
+    let mut key_slots_new = *key_slots_prev;
     // Remove released keys, i.e. keys that are in `key_slots` but not in `keys_pressed`.
     // If key press is uncertain, keep it in slots.
     key_slots_new.iter_mut()
@@ -158,7 +158,7 @@ fn update_slots(
     for k in regular_keys.iter().filter_map(|x| x.into_option()) {
         // Skip keys that are already in `key_slots`
         if key_slots_new.iter().contains(&Some(k)) {
-            continue
+            continue;
         }
         // add them to first free `None` spot
         for slot in key_slots_new.iter_mut() {
@@ -172,7 +172,9 @@ fn update_slots(
 }
 
 fn set_modifier_keys(keyboard: &mut KBoard, modifier_slots: u16) {
-    unsafe{ keyboard.set_modifier(modifier_slots); }
+    unsafe {
+        keyboard.set_modifier(modifier_slots);
+    }
 }
 fn set_regular_keys(keyboard: &mut KBoard, key_slots: &[Option<u8>; 6]) {
     unsafe {
@@ -199,7 +201,9 @@ fn set_media_keys(
         if !keys.clone().contains(k_old) {
             for &(regular_key, media_key) in info.media_key_bindings.iter() {
                 if regular_key == ((k_old as u32) | 0xF000) {
-                    unsafe{ keyboard.release(media_key as u16); }
+                    unsafe {
+                        keyboard.release(media_key as u16);
+                    }
                 }
             }
         }
@@ -209,7 +213,9 @@ fn set_media_keys(
         if !keys_old.clone().contains(k) {
             for &(regular_key, media_key) in info.media_key_bindings.iter() {
                 if regular_key == ((k as u32) | 0xF000) {
-                    unsafe{ keyboard.press(media_key as u16); }
+                    unsafe {
+                        keyboard.press(media_key as u16);
+                    }
                 }
             }
         }
@@ -232,14 +238,14 @@ fn wait(rescan_interval: u32, prev_loop: &mut MillisTimer) {
 pub fn alive(led: &mut Pin) {
     // Blink led with custom wrapper
     for i in 0..6 {
-        led.digital_write(i%2 == 0);
+        led.digital_write(i % 2 == 0);
         delay(50);
     }
     delay(200)
 }
 
 #[no_mangle]
-pub extern fn main() {
+pub extern "C" fn main() {
     let mut pinrow = setup();
     let mut led = pinrow.get_led();
     // Without some small delaying, the teensy may not start properly or something
@@ -258,10 +264,10 @@ pub extern fn main() {
     let mut fn_key_prev: bool = false;
 
     // Note that due to GPIO pin settlement (sleep 1ms) best possible scan rate is about 10ms.
-    let rescan_interval = 10;  // milliseconds
+    let rescan_interval = 10; // milliseconds
     let mut prev_loop = MillisTimer::new();
 
-    let mut keyboard = unsafe{b::Keyboard};
+    let mut keyboard = unsafe { b::Keyboard };
     loop {
         wait(rescan_interval, &mut prev_loop);
         let scan = mat.scan_key_press();
@@ -274,7 +280,7 @@ pub extern fn main() {
             &key_slots_prev,
             modifier_slots_prev,
             fn_key_prev,
-            &mat.info
+            &mat.info,
         );
 
         let modifier_slots = modifier_keys.iter().fold(0, |acc, k| k.into_inner() | acc);
@@ -302,5 +308,4 @@ pub extern fn main() {
         key_slots_fn_prev = key_slots_fn;
         fn_key_prev = fn_key;
     }
-
 }

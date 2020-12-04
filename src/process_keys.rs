@@ -6,10 +6,10 @@
 //! Naive implementation would register ghost presses, but this does not. Also this
 //! implementation is quite sophisticated, and it detects all keys that are possible
 //! to be deteceted.
-use heapless::{Vec}; // fixed capacity `std::Vec`
+use heapless::Vec; // fixed capacity `std::Vec`
 
-use teensy3::util::{delay};
-use teensy3::pins::{Pin, PinRow, PinMode};
+use teensy3::pins::{Pin, PinMode, PinRow};
+use teensy3::util::delay;
 
 use super::{full_vec, ShortVec};
 
@@ -33,7 +33,7 @@ pub enum KeyCode<T> {
     /// Key is pressed with certainty. Inner value corresponds to the key code.
     Certain(T),
     /// Key may or may not be pressed. Inner value corresponds to the key code.
-    Uncertain(T)
+    Uncertain(T),
 }
 use KeyCode::*;
 impl<T> KeyCode<T> {
@@ -111,9 +111,9 @@ impl KeyMatrix {
         // Conflicts may occur if multiple keys are pressed at the same time.
         // By knowing what presses are "ghost" artifacts, they can be dropped out. Those that
         // can not be discarded, will be informed to caller that they are uncertain
-        let mut mat: ShortVec<ShortVec<KeyState>>
-            = full_vec(full_vec(Free, self.col_pins.len()), self.row_pins.len());
-        let mut erroneous_keys: ShortVec<(usize, usize)> = Vec::new();  // *potentially erroneous
+        let mut mat: ShortVec<ShortVec<KeyState>> =
+            full_vec(full_vec(Free, self.col_pins.len()), self.row_pins.len());
+        let mut erroneous_keys: ShortVec<(usize, usize)> = Vec::new(); // *potentially erroneous
         // Performance: Delays takes about 9000 us and conflict detection about 50-100 us
         for (col, drain) in self.col_pins.iter_mut().enumerate() {
             drain.digital_write(false);  // enable drain
@@ -124,18 +124,18 @@ impl KeyMatrix {
                         Some(c) => {
                             let conflict = scan_for_conflicts(&mut mat, row, col, true);
                             if conflict { Maybe(c) } else { Pressed(c) }
-                        },
+                        }
                         None => {  // Uh oh, such connection should not exists for any key.
                             // One can not be yet sure whether error originates from multiple key
                             // presses or poorly configured key matrix. That's why `erroneous_keys`
                             // is checked later.
                             erroneous_keys.push((row, col)).unwrap_or(());
                             Free
-                        },
+                        }
                     }
                 }
             }
-            drain.digital_write(true);  // disable drain
+            drain.digital_write(true); // disable drain
             delay(1); // It takes time for pullup pin to charge back to full voltage
         }
         erroneous_keys.into_iter()
@@ -149,7 +149,7 @@ impl KeyMatrix {
             .filter_map(|k| match *k {
                 Pressed(c) => Some(Certain(c)),
                 Maybe(c) => Some(Uncertain(c)),
-                _ => None
+                _ => None,
             }).collect();
 
         return if keys.len() > 0 {
@@ -164,7 +164,7 @@ fn scan_for_conflicts(
     mat: &mut ShortVec<ShortVec<KeyState>>,
     row: usize,
     col: usize,
-    update: bool
+    update: bool,
 ) -> bool {
     assert!(mat[row][col] == Free);
     let reserved_cols: ShortVec<usize> = mat[row].iter().enumerate()
@@ -211,5 +211,4 @@ fn scan_for_conflicts(
         }
         return conflict;
     }
-
 }

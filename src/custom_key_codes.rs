@@ -1,11 +1,11 @@
 //! This file contains custom key layout configuration of my keyboard.
 //! This is also good place to see how key matrix recording is done in practise.
 
-use heapless::Vec;
+use crate::process_keys::{ExtraKeyInfo, KeyMatrix};
 use crate::record_keyboard_matrix::figure_out_key_matrix;
-use crate::process_keys::{KeyMatrix, ExtraKeyInfo};
-use teensy3::{bindings as b, pins::PinRow};
 use crate::ShortVec;
+use heapless::Vec;
+use teensy3::{bindings as b, pins::PinRow};
 
 const MODIFIERKEY_FN: u32 = 0xE800;
 
@@ -57,7 +57,7 @@ const KEY_NAMES: &[&[&str]] = &[
 pub fn ask_key_codes_and_print_them(pinrow: &mut PinRow) -> KeyMatrix {
     let info = extra_information_about_key_codes();
     let mat = figure_out_key_matrix(pinrow, KEY_CODES, KEY_NAMES, info);
-    return mat
+    return mat;
 }
 
 /// This function contains key codes that are generated with `ask_key_codes_and_print_them`
