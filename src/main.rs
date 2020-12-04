@@ -20,7 +20,6 @@ use teensy3::bindings as b;
 use b::usb_keyboard_class as KBoard;
 
 use process_keys::{KeyCode, ExtraKeyInfo};
-use core::convert::TryInto;
 
 type ShortVec<T> = Vec<T, MatrixCap>;
 
@@ -140,7 +139,8 @@ fn categorize_key_presses(
 /// Performance info: about 3 microseconds (negligible)
 fn update_slots(
     key_slots_prev: &[Option<u8>; 6],
-    regular_keys: &ShortVec<KeyCode<u8>>
+    regular_keys: &ShortVec<KeyCode<u8>>,
+    remove_only: bool,
 ) -> [Option<u8>; 6] {
     let mut key_slots_new = *key_slots_prev;  // Copy
     // Remove released keys, i.e. keys that are in `key_slots` but not in `keys_pressed`.
@@ -148,6 +148,11 @@ fn update_slots(
     key_slots_new.iter_mut()
         .filter(|s| s.filter(|s| !regular_keys.iter().any(|k| k.into_inner() == *s)).is_some())
         .for_each(|s| *s = None);
+
+    if remove_only {
+        return key_slots_new;
+    }
+
     // Add those keys of `keys_pressed` to `key_slots` that are not already there
     // Also, if key press is uncertain, do not add.
     for k in regular_keys.iter().filter_map(|x| x.into_option()) {
@@ -183,29 +188,30 @@ fn send_regular_keys(keyboard: &mut KBoard, key_slots: &[Option<u8>; 6]) {
 /// Media keys does not have u8 key codes, so their presses must be emulated on higher level
 fn send_media_keys(
     keyboard: &mut KBoard,
-    key_slots: &[Option<u8>; 6],
-    key_slots_prev: &[Option<u8>; 6],
-    info: &ExtraKeyInfo
+    key_slots_fn: &[Option<u8>; 6],
+    key_slots_fn_prev: &[Option<u8>; 6],
+    info: &ExtraKeyInfo,
 ) {
-    //keyboard.set_modifier(modifiers_pressed);
-    let keys = key_slots.iter().filter_map(|k| *k);
-    let keys_old = key_slots_prev.iter().filter_map(|k| *k);
-    for k in keys.clone() {
-        // If this key was not pressed on last time, prepare to press down corresponding media key
-        if !keys_old.clone().contains(k) {
-            for &(regular_key, media_key) in info.media_key_bindings.iter() {
-                if regular_key == ((k as u32) | 0xF000) {
-                    unsafe{ keyboard.press(media_key.try_into().unwrap()); }
-                }
-            }
-        }
-    }
-    for k_old in keys_old {
+    let keys = key_slots_fn.iter().filter_map(|k| *k);
+    let keys_old = key_slots_fn_prev.iter().filter_map(|k| *k);
+    for k_old in keys_old.clone() {
         // If this key has disappeared from current list, prepare to release corresponding media key
         if !keys.clone().contains(k_old) {
             for &(regular_key, media_key) in info.media_key_bindings.iter() {
                 if regular_key == ((k_old as u32) | 0xF000) {
-                    unsafe{ keyboard.release(media_key.try_into().unwrap()); }
+                    println!("Release {:?}", media_key);
+                    unsafe{ keyboard.release(media_key as u16); }
+                }
+            }
+        }
+    }
+    for k in keys {
+        // If this key was not pressed on last time, prepare to press down corresponding media key
+        if !keys_old.clone().contains(k) {
+            for &(regular_key, media_key) in info.media_key_bindings.iter() {
+                if regular_key == ((k as u32) | 0xF000) {
+                    println!("Press {:?}", media_key);
+                    unsafe{ keyboard.press(media_key as u16); }
                 }
             }
         }
@@ -224,24 +230,32 @@ fn wait(rescan_interval: u32, prev_loop: &mut MillisTimer) {
     *prev_loop = MillisTimer::new();
 }
 
+/// Blink the light twice to know we're alive
+pub fn alive(led: &mut Pin) {
+    // Blink led with custom wrapper
+    for i in 0..6 {
+        led.digital_write(i%2 == 0);
+        delay(50);
+    }
+    delay(200)
+}
+
 #[no_mangle]
 pub extern fn main() {
     let mut pinrow = setup();
     let mut led = pinrow.get_led();
+    // Without some small delaying, the teensy may not start properly or something
     for _ in 0..2 {
         alive(&mut led);
     }
-    println!("Hellouu!");
-    // loop {
-    //     let (i,j) = record_keyboard_matrix::wait_for_key(&mut pinrow);
-    //     println!("Recorded: {} {}", i, j);
-    // }
+    println!("Starting keyboard controller");
 
     //let mut mat = custom_key_codes::ask_key_codes_and_print_them(&mut pinrow);
     let mut mat = custom_key_codes::get_stored_key_codes(&mut pinrow);
 
     // Key presses from previous cycle
     let mut key_slots_prev: [Option<u8>; 6] = [None; 6];
+    let mut key_slots_fn_prev: [Option<u8>; 6] = [None; 6];
     let mut modifier_slots_prev: u16 = 0;
     let mut fn_key_prev: bool = false;
 
@@ -250,7 +264,7 @@ pub extern fn main() {
     let mut prev_loop = MillisTimer::new();
 
     let mut keyboard = unsafe{b::Keyboard};
-    for _ in 0..10000 {
+    loop {
         wait(rescan_interval, &mut prev_loop);
 
         let scan = mat.scan_key_press();
@@ -262,15 +276,13 @@ pub extern fn main() {
             &mat.info
         );
 
-        let key_slots = update_slots(&key_slots_prev, &regular_keys);
         let modifier_slots = modifier_keys.iter().fold(0, |acc, k| k.into_inner() | acc);
+        let key_slots = update_slots(&key_slots_prev, &regular_keys, fn_key);
+        let key_slots_fn = update_slots(&key_slots_fn_prev, &regular_keys, !fn_key);
 
-        if !fn_key {
-            send_regular_keys(&mut keyboard, &key_slots);
-        } else {
-            send_media_keys(&mut keyboard, &key_slots, &key_slots_prev, &mat.info);
-        }
+        send_regular_keys(&mut keyboard, &key_slots);
         send_modifier_keys(&mut keyboard, modifier_slots);
+        send_media_keys(&mut keyboard, &key_slots_fn, &key_slots_fn_prev, &mat.info);
 
         unsafe {
             keyboard.send_now();
@@ -279,29 +291,7 @@ pub extern fn main() {
         key_slots_prev = key_slots;
         modifier_slots_prev = modifier_slots;
         fn_key_prev = fn_key;
+        key_slots_fn_prev = key_slots_fn
     }
 
-
-    led.digital_write(false); // Set led off
-
-    // Blink Loop
-    for i in 0.. {
-        println!("{}", i);
-        // Show we are alive by blinking
-        alive(&mut led);
-        // Keep 2 second pause in blinking the led, also don't spam the console
-        delay(1000);
-    }
 }
-
-/// Blink the light twice to know we're alive
-pub fn alive(led: &mut Pin) {
-    // Blink led with custom wrapper
-    for i in 0..6 {
-        led.digital_write(i%2 == 0);
-        delay(50);
-    }
-    delay(200)
-}
-
-
