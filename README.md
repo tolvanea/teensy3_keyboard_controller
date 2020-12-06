@@ -16,12 +16,12 @@ I like my laptop's keyboard so much that I want to use it on my home pc also. Th
     * I had Teensy 3.6.
 * Raw keyboard pad 
     * I had spare part for Lenovo Thinkpad T480.
-* Way to connect the keyboard to microcontroller's pins.
+* Way to connect the keyboard into microcontroller's pins.
     * In my case that is flat cable connector PCB, which can be found from ebay.
  
 **Software used:**
 * Keyboard controller (content of this repository). The keyboard controller measures pin connections, translates them into key presses, and sends them over USB. This project implements it in Rust. 
-* Use of [Teensy C/C++ libraries](https://github.com/PaulStoffregen/cores). These libraries read microcontroller's pins, and they tell a host that this is an USB keyboard.
+* [Teensy C/C++ libraries](https://github.com/PaulStoffregen/cores). These libraries read microcontroller's pins, and they tell host pc that this is an USB keyboard.
 * Bindings between Rust code and C/C++ libraries. The library [teensy3-rs](https://github.com/tolvanea/teensy3-rs) was made on the way for this purpose.
 
 ## Hardware
@@ -31,7 +31,7 @@ Hardware aspects was not really main point of this project. I'm a programmer, an
 
 It is build on top of plastic chopping board that was previously used in kitchen. Underneath the board lies Teensy microcontroller. I soldered flat cable adapter to its GPIO pins. Here's image of my solderings:
 
-![Ugly!](documentation/this_is_not_how_to_do_it.jpg)
+![Ugly!](documentation/not_like_this.jpg)
 
 The copper wires are unprotected, because they were the only type of wire I had in hands at the build moment. I later submerged the whole thing in hot glue to prevent short circuits, which also made it more rigid and durable. The flat cable connector connects into keyboard. The flat cable in keyboard looks something like this:
 
