@@ -25,41 +25,43 @@ I like my laptop's keyboard so much that I want to use it on my home pc also. Th
 * Bindings between Rust code and C/C++ libraries. The library [teensy3-rs](https://github.com/tolvanea/teensy3-rs) was made on the way for this purpose.
 
 ## Hardware
-Hardware aspects was not really main point of this project. I'm a programmer, and the only thing that matters is that keyboard works reliably and that the code is pretty. The appearance of physical keyboard nor soldering beauty did not play any role. Clear? Now that questionable hardware aesthetics are sorted out of the way, here's finished product:
+Hardware aspects was not really main point of this project. Being a programmer, I only care that keyboard works reliably and the software inside is pretty. The physical appearance nor solder work did not play any role. Now that missing hardware aesthetics are out of the way, here's how it looks:
 
 ![My final product](documentation/finished_product.jpg)
 
-It is build on top of plastic chopping board that was previously used in kitchen. Underneath the board lies Teensy microcontroller. I soldered flat cable adapter to its GPIO pins. Here's image of my solderings:
+It is build on top of plastic chopping board that was previously used in kitchen. Underneath the board lies Teensy microcontroller. Here's image how flat cable adapter was soldered to Teensy's pins:
 
 ![Ugly!](documentation/not_like_this.jpg)
 
-The copper wires are unprotected, because they were the only type of wire I had in hands at the build moment. I later submerged the whole thing in hot glue to prevent short circuits, which also made it more rigid and durable. The flat cable connector connects into keyboard. The flat cable in keyboard looks something like this:
+The copper wire is uninsulated, because that was the only type of wire I had in hands at that moment. The wire was extracted from old vacuum cleaner. I later submerged the whole thing in hot glue to prevent short circuits, which also made it more rigid. The flat cable connector on the right connects into a keyboard. Keyboard's flat cable looks something like this:
 
 ![Flat cable](documentation/flat_cable.jpg)
 
-[Credits of above image goes to ebay seller _20come12_.] 
-The flat cable has about 30 lanes, which are directly connected into digital pins of microcontroller. When some key is pressed on a keyboard, then two of these lanes will be electrically connected. The microcontroller scans these lanes 100 times in a second, finds out what lanes are connected, and then translates them into corresponding key presses.
+[Credits of image goes to ebay seller _20come12_.] 
+
+The flat cable has about 30 lanes, which are directly connected into digital pins in microcontroller. When some key is pressed on a keyboard, then two of these lanes will be electrically connected. The microcontroller scans these lanes 100 times in a second, finds out what lanes are connected, and translates them into corresponding key presses.
 
 ## Software
-There are suprisingly many small things to consider when translating pin connections into key presses. A naive key detection would is quite straight forward to implement, but this keyboard controller goes further, and features a complete implementation with all the fine details sorted out. Most of these fine details are rare corner cases, and they will almost never play a real role in practice. For example, if three or more non-modifier keys are simultaneously pressed, then some non-pressed keys may be registered. Anyways, I'm happy to announce that this keyboard controller detects all the key presses it possibly can, and it never reports any invalid presses. As far as I know, it could not handle the job better, though I'm not counting potential bugs.
+There are suprisingly many small things to consider when translating pin connections into key presses. A naive key detection would be quite straight forward to implement, but this keyboard controller goes further, and does a complete implementation. Numerous fine details are sorted out, though most of them are so rare corner cases, that they will never appear in practice. For example, if three or more non-modifier keys are simultaneously pressed, then some other keys may be invalidly registered. Anyways, I'm happy to announce that this keyboard controller detects all the key presses it possibly can, and it never reports a false press. As far as I know, it could not handle the job better, though here is not considered performance, memory or potential bugs.
 
-Below is listed few features of this project, and they are compared to one of the most well known DIY keyboard [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller). Apples and oranges are compared here: This project is considerably more complex than the template, and also has three times more the code lines (~900 vs ~300). 
+Features of this project are compared to one of the most well known DIY keyboard [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller). Note that apples and oranges are compared here: This project is considerably more complex than the template, and this has also three times more the code lines (~900 vs ~300). 
 
 **Defining features of this project:**
-* Very easy key configuration: Just press each key once through and the correct key-to-pin configuration is figured out for you. This configuration, (a.k.a. "key matrix",) is printed out, and it can be directly copy-pasted to source code. This feature makes the software generic for any keyboard possible. (The only "hard coding" it requires is copy-pasting automatically generated keyboard matrix to source code.) Comparing to the above mentioned [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller), it does not have any key matrix generation feature, which is why each different keyboard model has its own custom source code fork.
-* Quick responsiveness: Keys are sent over usb only when they have changed state. This greatly reduces lag by not flooding USB with unnecessary packets. Again, this a contrasting feature to the [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller)
-* As mentioned previously, this software goes in lengths to handle simultaneous key presses correctly. As comparison, the [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller) may register non-existent ghost presses if many (non-modifier) keys are presses simultaneously. This may be expected from the simplicity of the template. However, noteworthy is that **this keyboard controller projects is even slightly more nuanced than the original keyboard controller made by Lenovo itself**. For example, Lenovo's keyboard controller built in my laptop can not register key presses like _F_ + _5_ + _F9_, but this keyboard controller can. If I was to guess why that is, Lenovo probably uses the exact same keyboard controller software for both keyboards with and without numpad. If there is no numpad, then there is also less possible pin connections, which makes some ambiguous combinations uniquely defined. (Even though no one would ever benefit from being able to use such combination, why leave capabilities on a table in first place?)
-* It's worth mentioning that Fn and media keys are supported as is also in [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller) also. This feature is explicitly mentioned because Fn key is not really a standard key, and requires some extra configuration. Oh, and by the way, automatic key matrix generation does not cover media keys, so they need to be hard coded by hand. One needs to only state that, for example, F2 key corresponds to volume decrease.
+* **Very easy key configuration:** By pressing each key once through, correct pin-to-key configuration is detected. This configuration, a.k.a. "key matrix", is printed out, and it can be directly copy-pasted to source code. This makes the controller generic for any keyboard. The only required hard coding is copy-pasting automatically generated keyboard matrix to source code. This can be compared to the above mentioned [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller), which does not have any key matrix generation feature, which is why each different keyboard model has its own custom source code fork. Figuring out keymatrix without any tooling is laborous and hard.
+* **Quick responsiveness:** Keys are sent over usb only when they have changed state. This greatly reduces lag by not flooding USB with unnecessary packets. This is in contrast to the [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller)
+* **Detection of simultaneous key presses:** As mentioned previously, this controller goes in lengths to handle simultaneous key presses correctly. As a comparison, the [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller) may register false presses if multiple keys are presses simultaneously. Another comparison can be also made: **this keyboard controller is even slightly more capable than the original made by Lenovo itself**. For example, my laptop keyboard can not register key presses like _F_ + _5_ + _F9_, but this USB keyboard can, even though they both use the same physical keyboard. I guess tha Lenovo probably uses same keyboard controller software for both keyboards with and without numpad. When there is no numpad, there is also less valid pin connections, which can make some ambiguous combinations uniquely defined. Though, no one would ever benefit from being able to use such key combination, but why leave capabilities on the table in first place?
+* **Fn and media key support.** This feature is not very particular, as media keys are also supported in the [controller template](https://github.com/thedalles77/USB_Laptop_Keyboard_Controller). The feature is explicitly mentioned, because Fn key is not really a standard key, and it requires some extra configuration. (Oh, and by the way, automatic key matrix generation does not cover media keys. One needs to hard code, for example, that F2 key corresponds to a volume decrease.)
 
-**Known downsides / missing features**
-* Detection of complex key combinations requires some processing power. On teensy 3.6 it takes up to 100 microseconds, which is negligible within 10 millisecond refresh rate. However, if microcontroller would have only 1/100th of the perfomance, then this may arise a considerable problem. 
-    * There is probably no way around this performance requirement if correct behaviour is aimed for. 
-* No key backlight.
-    * This would be fairly easy to implement, but it is not (yet) made.
-* If the program happens to crash, the microcontroller does not restart itself, so it requires replugging the USB.
-    * Automatic restarting should be fairly doable, but that becomes greater concern if the controller manages to crash itself.
-* The Thinkpad keyboard has integrated mouse buttons and trackpoint, but they are disabled.
-    * They would require another flat cable adapter, and _a lot of_ extra coding. No support planned for them.
+**Known downsides of this project**
+* Detection of complex key combinations requires some processing power. 
+    * Detection takes up to 100 microseconds on teensy 3.6, which is negligible within 10 millisecond refresh rate. However, if microcontroller would have less than 1/100th of the perfomance, then this may arise a problem. 
+    * There is probably no way around the performance requirement with maintaining correct behaviour. 
+* No backlight.
+    * This would be fairly easy to implement, but it is not (yet) on interests.
+* If this keyboard controller happens to crash, the Teensy does not restart itself, so replugging the USB is required.
+    * Automatic restarting should be fairly doable. However, it becomes more important after the controller manages to crash itself once.
+* The Thinkpad keyboard has integrated mouse buttons and trackpoint, but they are not used.
+    * Getting them to work would require another flat cable adapter and _a lot of_ coding. No support planned.
 
 
 
