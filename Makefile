@@ -7,11 +7,13 @@
 #MODEL=TEENSY35
 #MODEL=TEENSY36
 
+# Package manager can be selected from Cargo or Cross.
+# Use Cargo only if you have installed all dependencies. Dependencies can be found from Dockerfile
 PKGMAN=cross
-#PKGMAN=cargo  # You can use cargo if you have installed all dependencies from Dockerfile
+#PKGMAN=cargo
 
 # --------------------------------------------
-# The rest of makefile need not to be touched
+# The rest of makefile need not to be changed
 # --------------------------------------------
 
 # Following definition makes hopefully more understandable error message when
