@@ -47,8 +47,7 @@ impl<I: Iterator<Item=T>, T: PartialEq> Contains<T> for I {
 }
 
 fn setup() -> PinRow {
-    // It's unsafe because caller verifies that it's called only once
-    unsafe { PinRow::new_once() }
+    PinRow::new_once()
 }
 
 enum Key {
