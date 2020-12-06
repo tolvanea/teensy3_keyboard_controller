@@ -46,10 +46,6 @@ impl<I: Iterator<Item=T>, T: PartialEq> Contains<T> for I {
     }
 }
 
-fn setup() -> PinRow {
-    PinRow::new_once()
-}
-
 enum Key {
     Normal(u8),
     Modifier(u16),
@@ -245,7 +241,7 @@ pub fn alive(led: &mut Pin) {
 
 #[no_mangle]
 pub extern "C" fn main() {
-    let mut pinrow = setup();
+    let mut pinrow = PinRow::new_once();
     let mut led = pinrow.get_led();
     // Without some small delaying, the teensy may not start properly or something
     for _ in 0..2 {
