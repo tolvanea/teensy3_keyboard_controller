@@ -1,5 +1,5 @@
 # Keyboard controller with Teensy 3 and Rust
-DIY usb-keyboard from raw keyboard pad that is extracted from laptop.
+DIY usb-keyboard from raw keyboard pad of laptop
 
 ## Introduction
 ### What?
