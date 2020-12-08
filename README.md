@@ -25,7 +25,7 @@ My laptop's keyboard so good that I want to also use it on my desktop PC. With t
 * Bindings between Rust code and C/C++ libraries. The library [teensy3-rs](https://github.com/tolvanea/teensy3-rs) was made on the way for this purpose.
 
 ## Installation
-This project is built on top of template [teensy3-rs-demo]https://github.com/tolvanea/teensy3-rs-demo, which contains installation instructions for Docker container.
+This project is built on top of template [teensy3-rs-demo](https://github.com/tolvanea/teensy3-rs-demo), which contains installation instructions for Docker container.
 
 ## Hardware
 Hardware aspects was not a main point of this project. Being a programmer, I only care that the software is pretty and the keyboard is functional. The physical appearance was not very high on objective list. Now that the hardware aesthetics are sorted out of the way, here's how it ended up looking:
