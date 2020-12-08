@@ -444,7 +444,7 @@ fn build_and_print_code_matrix(
             .collect();\n\
         let rows = Vec::from_slice(&{:?}).unwrap();\n\
         let cols = Vec::from_slice(&{:?}).unwrap();\n\
-        let mat = KeyMatrix::new(pinrow, code_matrix, rows, cols);",
+        let mat = KeyMatrix::new(pinrow, code_matrix, rows, cols, info);",
         row_pins, col_pins
     );
     return code_matrix;
