@@ -248,26 +248,30 @@ pub extern "C" fn main() {
         alive(&mut led);
     }
     println!("Starting keyboard controller");
-
+    
     //let mut mat = custom_key_codes::ask_key_codes_and_print_them(&mut pinrow);
     let mut mat = custom_key_codes::get_stored_key_codes(&mut pinrow);
-
+    
     // Key presses from previous cycle
     let mut key_slots_prev: [Option<u8>; 6] = [None; 6];
     let mut key_slots_fn_prev: [Option<u8>; 6] = [None; 6];
     let mut modifier_slots_prev: u16 = 0;
     let mut fn_key_prev: bool = false;
-
+    
     // Note that due to GPIO pin settlement (sleep 1ms) best possible scan rate is about 10ms.
     let rescan_interval = 10; // milliseconds
     let mut prev_loop = MillisTimer::new();
-
+    
     let mut keyboard = unsafe { b::Keyboard };
+    println!("Entering main loop");
     loop {
         wait(rescan_interval, &mut prev_loop);
         let scan = mat.scan_key_press();
         // Proceed to send key states only if something is pressed
-        if scan.is_none() && key_slots_prev.iter().all(|s| s.is_none()) {
+        if scan.is_none() 
+            && key_slots_prev.iter().all(|s| s.is_none())
+            && modifier_slots_prev == 0 
+        {
             continue;
         }
         let (regular_keys, modifier_keys, fn_key) = categorize_key_presses(
@@ -282,7 +286,10 @@ pub extern "C" fn main() {
         let key_slots = update_slots(&key_slots_prev, &regular_keys, fn_key);
         let key_slots_fn = update_slots(&key_slots_fn_prev, &regular_keys, !fn_key);
 
+        println!("mod: {:016b}\nkeys: {:?}\nkey_slots_fn: {:?}\n", modifier_slots, key_slots, key_slots_fn);
+
         // Proceed to send key states only if some key states are changed
+        // TODO fine grane each type individually
         if (modifier_slots == modifier_slots_prev)
             && (key_slots == key_slots_prev)
             && (key_slots_fn == key_slots_fn_prev)
