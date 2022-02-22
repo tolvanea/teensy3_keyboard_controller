@@ -13,8 +13,8 @@ pub use typenum::U24 as MatrixCap; // Maximum capacities
 
 use heapless::{ArrayLength, Vec}; // fixed capacity `std::Vec`
 
-use b::usb_keyboard_class as KBoard;
 use teensy3::bindings as b;
+use b::usb_keyboard_class as KBoard;
 use teensy3::pins::{Pin, PinRow};
 use teensy3::util::{delay, MillisTimer};
 
@@ -286,7 +286,7 @@ pub extern "C" fn main() {
         let key_slots = update_slots(&key_slots_prev, &regular_keys, fn_key);
         let key_slots_fn = update_slots(&key_slots_fn_prev, &regular_keys, !fn_key);
 
-        println!("mod: {:016b}\nkeys: {:?}\nkey_slots_fn: {:?}\n", modifier_slots, key_slots, key_slots_fn);
+        //println!("mod: {:016b}\nkeys: {:?}\nkey_slots_fn: {:?}\n", modifier_slots, key_slots, key_slots_fn);
 
         // Proceed to send key states only if some key states are changed
         // TODO fine grane each type individually
