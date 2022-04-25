@@ -259,6 +259,10 @@ pub extern "C" fn main() {
     let mut key_slots_fn_prev: [Option<u8>; 6] = [None; 6];
     let mut modifier_slots_prev: u16 = 0;
     let mut fn_key_prev: bool = false;
+
+    // Key presses from last 2 cycles. Used only for debounce, i.e. fixing rare voltage misbehaviour
+    let mut scan_prev1: Option<ShortVec<KeyCode<u32>>> = None;
+    let mut scan_prev2: Option<ShortVec<KeyCode<u32>>> = None;
     
     // Note that due to GPIO pin settlement (sleep 1ms) best possible scan rate is about 10ms.
     let rescan_interval = 10; // milliseconds
@@ -269,6 +273,12 @@ pub extern "C" fn main() {
     loop {
         wait(rescan_interval, &mut prev_loop);
         let scan = mat.scan_key_press();
+
+        // Fix hardware glitch where voltage bounces back after releasing key
+        let scan = process_keys::debounce(scan, &scan_prev1, &scan_prev2);
+        scan_prev2 = scan_prev1;
+        scan_prev1 = scan.clone();
+
         // Proceed to send key states only if something is pressed
         if scan.is_none()
             && key_slots_prev.iter().all(|s| s.is_none())

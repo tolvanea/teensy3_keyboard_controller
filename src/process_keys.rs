@@ -212,3 +212,26 @@ fn scan_for_conflicts(
         return conflict;
     }
 }
+
+/// Debounce fixes common push button problem where quick "on-off" presses may be registered as
+/// two "on-off" presses. This phenomenon is caused by capasitance of circuit, which makes voltage
+/// somehow oscillate. The fix is to check that if some key is released only for one scan interval
+/// only, then continue the release for another scan interval. So 10ms release becomes to 20ms.
+pub fn debounce(
+    scan: Option<ShortVec<KeyCode<u32>>>,
+    scan_prev1: &Option<ShortVec<KeyCode<u32>>>,
+    scan_prev2: &Option<ShortVec<KeyCode<u32>>>
+) -> Option<ShortVec<KeyCode<u32>>> {
+    let now_len   = scan.as_ref().map_or(0, |vec| vec.len());
+    let prev1_len = scan_prev1.as_ref().map_or(0, |vec| vec.len());
+    // Affirm that some keys are released only on 'scan_prev1', and not on 'scan' or 'scan_prev2'
+    // Simplification and performance optimization:
+    // Don't consider a case where other keys are also operated at the same time
+    if scan == *scan_prev2 && prev1_len < now_len {
+        // Back-bounce detected, do not register the most recent button press
+        return scan_prev1.clone();
+    } else {
+        // No bounce, return the original
+        return scan;
+    }
+}
