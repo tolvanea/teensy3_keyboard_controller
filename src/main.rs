@@ -255,10 +255,10 @@ pub extern "C" fn main() {
     let mut mat = custom_key_codes::get_stored_key_codes(&mut pinrow);
     
     // Key presses from previous cycle
-    let mut key_slots_prev: [Option<u8>; 6] = [None; 6];
-    let mut key_slots_fn_prev: [Option<u8>; 6] = [None; 6];
-    let mut modifier_slots_prev: u16 = 0;
-    let mut fn_key_prev: bool = false;
+    let mut key_slots_prev: [Option<u8>; 6] = [None; 6];        // Normal keys
+    let mut key_slots_fn_prev: [Option<u8>; 6] = [None; 6];     // Media keys (fn combinations)
+    let mut modifier_slots_prev: u16 = 0;                       // Ctrl, Shift, Alt, AltGr
+    let mut fn_key_prev: bool = false;                          // Fn
 
     // Key presses from last 2 cycles. Used only for debounce, i.e. fixing rare voltage misbehaviour
     let mut scan_prev1: Option<ShortVec<KeyCode<u32>>> = None;
@@ -299,9 +299,12 @@ pub extern "C" fn main() {
         let key_slots = update_slots(&key_slots_prev, &regular_keys, fn_key);
         let key_slots_fn = update_slots(&key_slots_fn_prev, &regular_keys, !fn_key);
 
-        //println!("mod: {:016b}\nkeys: {:?}\nkey_slots_fn: {:?}\n", modifier_slots, key_slots, key_slots_fn);
+//         println!(
+//             "mod: {:016b}{:<8}keys: {:?}{:<16}key_slots_fn: {:?}",
+//             modifier_slots, "\n", key_slots, "\n", key_slots_fn
+//         );
 
-        // Proceed to send key states only if they are changed (Tiny performance optimization)
+        // Proceed to send key states only if they are changed. (A tiny performance optimization)
         if modifier_slots != modifier_slots_prev {
             set_modifier_keys(&mut keyboard, modifier_slots);
             modifier_slots_prev = modifier_slots;
