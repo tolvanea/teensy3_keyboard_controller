@@ -313,16 +313,11 @@ pub extern "C" fn main() {
         if key_slots_fn != key_slots_fn_prev {
             set_media_keys(&mut keyboard, &key_slots_fn, &key_slots_fn_prev, &mat.info);
             key_slots_fn_prev = key_slots_fn;
-            fn_key_prev = fn_key;
         }
+        fn_key_prev = fn_key;
 
-        if (modifier_slots != modifier_slots_prev)
-            || (key_slots != key_slots_prev)
-            || (key_slots_fn != key_slots_fn_prev)
-        {
-            unsafe {
-                keyboard.send_now();
-            }
+        unsafe {
+            keyboard.send_now();
         }
     }
 }
