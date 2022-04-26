@@ -215,23 +215,23 @@ fn scan_for_conflicts(
 
 /// Debounce fixes common push button problem where quick "on-off" presses may be registered as
 /// two "on-off" presses. This phenomenon is caused by capasitance of circuit, which makes voltage
-/// somehow oscillate. The fix is to check that if some key is released only for one scan interval
-/// only, then continue the release for another scan interval. So 10ms release becomes to 20ms.
+/// somehow oscillate. The fix is to check that if some key is pressed or released only for one scan
+/// interval, then continue that state for another scan interval. So 10ms press/release becomes 20ms
 pub fn debounce(
-    scan: Option<ShortVec<KeyCode<u32>>>,
-    scan_prev1: &Option<ShortVec<KeyCode<u32>>>,
-    scan_prev2: &Option<ShortVec<KeyCode<u32>>>
+    scan: Option<ShortVec<KeyCode<u32>>>,           // most recent scan
+    scan_prev1: &Option<ShortVec<KeyCode<u32>>>,    // the scan from last round
+    scan_prev2: &Option<ShortVec<KeyCode<u32>>>     // the scan two rounds ago
 ) -> Option<ShortVec<KeyCode<u32>>> {
     let now_len   = scan.as_ref().map_or(0, |vec| vec.len());
     let prev1_len = scan_prev1.as_ref().map_or(0, |vec| vec.len());
-    // Affirm that some keys are released only on 'scan_prev1', and not on 'scan' or 'scan_prev2'
-    // Simplification and performance optimization:
-    // Don't consider a case where other keys are also operated at the same time
-    if scan == *scan_prev2 && prev1_len < now_len {
-        // Back-bounce detected, do not register the most recent button press
+    // Affirm that some keys are pressed/released only at 'scan_prev1' scan interval
+    // This contains a simplification (and performance optimization) that assumes no other keys
+    // are not operated at the same time. If other keys are operated, then debounce may happen.
+    if scan == *scan_prev2 && prev1_len != now_len {
+        // Back-bounce detected, do not register the most recent scan, but take the previous one
         return scan_prev1.clone();
     } else {
-        // No bounce, return the original
+        // No bounce detected, return the most recent scan as it is suppoded to be
         return scan;
     }
 }
