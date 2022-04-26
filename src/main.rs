@@ -9,12 +9,12 @@ extern crate teensy3;
 mod custom_key_codes;
 mod process_keys;
 mod record_keyboard_matrix;
-pub use typenum::U24 as MatrixCap; // Maximum capacities
+pub use typenum::U24 as MatrixCap; // Maximum side length of keyboard matrix (=24)
 
 use heapless::{ArrayLength, Vec}; // fixed capacity `std::Vec`
 
-use b::usb_keyboard_class as KBoard;
 use teensy3::bindings as b;
+use b::usb_keyboard_class as KBoard;
 use teensy3::pins::{Pin, PinRow};
 use teensy3::util::{delay, MillisTimer};
 
@@ -71,7 +71,7 @@ fn extract_key_type(key_code: u32, info: &ExtraKeyInfo) -> Key {
 /// Categorize key presses to regular keys, modifier keys and Fn key. Also crop out those keys
 /// that are unsure and has not been pressed on last time.
 fn categorize_key_presses(
-    scanned_keys: Option<ShortVec<KeyCode<u32>>>,
+    scanned_keys: &Option<ShortVec<KeyCode<u32>>>,
     key_slots: &[Option<u8>; 6],
     modifiers_pressed_old: u16,
     fn_pressed_old: bool,
@@ -85,7 +85,7 @@ fn categorize_key_presses(
         None => return (regular_keys, modifier_keys, fn_key),
     };
     // Now something is pressed
-    for state in scanned_keys.into_iter() {
+    for &state in scanned_keys.iter() {
         match state {
             KeyCode::Certain(code) => {
                 // Some key is pressed without ambiguities
@@ -138,7 +138,7 @@ fn update_slots(
 ) -> [Option<u8>; 6] {
     // Copy
     let mut key_slots_new = *key_slots_prev;
-    // Remove released keys, i.e. keys that are in `key_slots` but not in `keys_pressed`.
+    // Remove released keys, i.e. keys that are in `key_slots` but not in `regular_keys`.
     // If key press is uncertain, keep it in slots.
     key_slots_new.iter_mut()
         .filter(|s| s.filter(|s| !regular_keys.iter().any(|k| k.into_inner() == *s)).is_some())
@@ -148,7 +148,7 @@ fn update_slots(
         return key_slots_new;
     }
 
-    // Add those keys of `keys_pressed` to `key_slots` that are not already there
+    // Add those keys of `regular_keys` to `key_slots` that are not already there
     // Also, if key press is uncertain, do not add.
     for k in regular_keys.iter().filter_map(|x| x.into_option()) {
         // Skip keys that are already in `key_slots`
@@ -249,14 +249,20 @@ pub extern "C" fn main() {
     }
     println!("Starting keyboard controller");
     
+    // To generate keyboard matrix, uncomment 'ask_key_codes_and_print_them',
+    // and copy-paste generated source into 'get_stored_key_codes'
     //let mut mat = custom_key_codes::ask_key_codes_and_print_them(&mut pinrow);
     let mut mat = custom_key_codes::get_stored_key_codes(&mut pinrow);
     
     // Key presses from previous cycle
-    let mut key_slots_prev: [Option<u8>; 6] = [None; 6];
-    let mut key_slots_fn_prev: [Option<u8>; 6] = [None; 6];
-    let mut modifier_slots_prev: u16 = 0;
-    let mut fn_key_prev: bool = false;
+    let mut key_slots_prev: [Option<u8>; 6] = [None; 6];        // Normal keys
+    let mut key_slots_fn_prev: [Option<u8>; 6] = [None; 6];     // Media keys (fn combinations)
+    let mut modifier_slots_prev: u16 = 0;                       // Ctrl, Shift, Alt, AltGr
+    let mut fn_key_prev: bool = false;                          // Fn
+
+    // Key presses from last 2 cycles. Used only for debounce, i.e. fixing rare voltage misbehaviour
+    let mut scan_prev1: Option<ShortVec<KeyCode<u32>>> = None;
+    let mut scan_prev2: Option<ShortVec<KeyCode<u32>>> = None;
     
     // Note that due to GPIO pin settlement (sleep 1ms) best possible scan rate is about 10ms.
     let rescan_interval = 10; // milliseconds
@@ -267,15 +273,22 @@ pub extern "C" fn main() {
     loop {
         wait(rescan_interval, &mut prev_loop);
         let scan = mat.scan_key_press();
+
+        // Fix hardware glitch where voltage bounces back after releasing key
+        let scan = process_keys::debounce(scan, &scan_prev1, &scan_prev2);
+        scan_prev2 = scan_prev1;
+        scan_prev1 = scan.clone();
+
         // Proceed to send key states only if something is pressed
-        if scan.is_none() 
+        if scan.is_none()
             && key_slots_prev.iter().all(|s| s.is_none())
-            && modifier_slots_prev == 0 
+            && key_slots_fn_prev.iter().all(|s| s.is_none())
+            && modifier_slots_prev == 0
         {
             continue;
         }
         let (regular_keys, modifier_keys, fn_key) = categorize_key_presses(
-            scan,
+            &scan,
             &key_slots_prev,
             modifier_slots_prev,
             fn_key_prev,
@@ -286,28 +299,28 @@ pub extern "C" fn main() {
         let key_slots = update_slots(&key_slots_prev, &regular_keys, fn_key);
         let key_slots_fn = update_slots(&key_slots_fn_prev, &regular_keys, !fn_key);
 
-        println!("mod: {:016b}\nkeys: {:?}\nkey_slots_fn: {:?}\n", modifier_slots, key_slots, key_slots_fn);
+//         println!(
+//             "mod: {:016b}{:<8}keys: {:?}{:<16}key_slots_fn: {:?}",
+//             modifier_slots, "\n", key_slots, "\n", key_slots_fn
+//         );
 
-        // Proceed to send key states only if some key states are changed
-        // TODO fine grane each type individually
-        if (modifier_slots == modifier_slots_prev)
-            && (key_slots == key_slots_prev)
-            && (key_slots_fn == key_slots_fn_prev)
-        {
-            continue;
-        };
-
-        set_modifier_keys(&mut keyboard, modifier_slots);
-        set_regular_keys(&mut keyboard, &key_slots);
-        set_media_keys(&mut keyboard, &key_slots_fn, &key_slots_fn_prev, &mat.info);
+        // Proceed to send key states only if they are changed. (A tiny performance optimization)
+        if modifier_slots != modifier_slots_prev {
+            set_modifier_keys(&mut keyboard, modifier_slots);
+            modifier_slots_prev = modifier_slots;
+        }
+        if key_slots != key_slots_prev {
+            set_regular_keys(&mut keyboard, &key_slots);
+            key_slots_prev = key_slots;
+        }
+        if key_slots_fn != key_slots_fn_prev {
+            set_media_keys(&mut keyboard, &key_slots_fn, &key_slots_fn_prev, &mat.info);
+            key_slots_fn_prev = key_slots_fn;
+        }
+        fn_key_prev = fn_key;
 
         unsafe {
             keyboard.send_now();
         }
-
-        modifier_slots_prev = modifier_slots;
-        key_slots_prev = key_slots;
-        key_slots_fn_prev = key_slots_fn;
-        fn_key_prev = fn_key;
     }
 }
