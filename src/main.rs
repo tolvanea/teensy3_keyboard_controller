@@ -260,10 +260,11 @@ pub extern "C" fn main() {
     let mut modifier_slots_prev: u16 = 0;                       // Ctrl, Shift, Alt, AltGr
     let mut fn_key_prev: bool = false;                          // Fn
 
-    // Key presses from last 2 cycles. Used only for debounce, i.e. fixing rare voltage misbehaviour
-    let mut scan_prev1: Option<ShortVec<KeyCode<u32>>> = None;
-    let mut scan_prev2: Option<ShortVec<KeyCode<u32>>> = None;
-    
+    // Key presses from previous 3 cycles. Used only for debouncing, i.e. fixing rare misbehaviour
+    let mut scan1: Option<ShortVec<KeyCode<u32>>> = None;
+    let mut scan2: Option<ShortVec<KeyCode<u32>>> = None;
+    let mut scan3: Option<ShortVec<KeyCode<u32>>> = None;
+
     // Note that due to GPIO pin settlement (sleep 1ms) best possible scan rate is about 10ms.
     let rescan_interval = 10; // milliseconds
     let mut prev_loop = MillisTimer::new();
@@ -272,12 +273,13 @@ pub extern "C" fn main() {
     println!("Entering main loop");
     loop {
         wait(rescan_interval, &mut prev_loop);
-        let scan = mat.scan_key_press();
+        let scan0 = mat.scan_key_press();
 
-        // Fix hardware glitch where voltage bounces back after releasing key
-        let scan = process_keys::debounce(scan, &scan_prev1, &scan_prev2);
-        scan_prev2 = scan_prev1;
-        scan_prev1 = scan.clone();
+        // Fix hardware glitch where voltage bounces back after releasing the key
+        let scan = process_keys::debounce(scan0, &scan1, &scan2, &scan3);
+        scan3 = scan2;
+        scan2 = scan1;
+        scan1 = scan.clone();
 
         // Proceed to send key states only if something is pressed
         if scan.is_none()
