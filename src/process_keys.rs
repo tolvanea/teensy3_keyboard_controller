@@ -215,23 +215,34 @@ fn scan_for_conflicts(
 
 /// Debounce fixes common push button problem where quick "on-off" presses may be registered as
 /// two "on-off" presses. This phenomenon is caused by capasitance of circuit, which makes voltage
-/// somehow oscillate. The fix is to check that if some key is pressed or released only for one scan
-/// interval, then continue that state for another scan interval. So 10ms press/release becomes 20ms
+/// somehow oscillate. The fix is to check that if an event (press/release) last only for 1-2 scan
+/// intervals, then continue that for 3 scan interval. So 10ms/20ms press/release becomes
+/// 30ms one. This functions assumes a simplification (and performance optimization) that no other
+/// keys are not operated at the same time. If other keys are operated, then debounce may happen.
+/// This function requires that the given history (scan1-scan3) is already result of this debounce.
 pub fn debounce(
-    scan: Option<ShortVec<KeyCode<u32>>>,           // most recent scan
-    scan_prev1: &Option<ShortVec<KeyCode<u32>>>,    // the scan from last round
-    scan_prev2: &Option<ShortVec<KeyCode<u32>>>     // the scan two rounds ago
+    scan0: Option<ShortVec<KeyCode<u32>>>,     // the most recent scan
+    scan1: &Option<ShortVec<KeyCode<u32>>>,    // the scan from last round
+    scan2: &Option<ShortVec<KeyCode<u32>>>,    // the scan two rounds ago
+    scan3: &Option<ShortVec<KeyCode<u32>>>,    // the scan three rounds ago
 ) -> Option<ShortVec<KeyCode<u32>>> {
-    let now_len   = scan.as_ref().map_or(0, |vec| vec.len());
-    let prev1_len = scan_prev1.as_ref().map_or(0, |vec| vec.len());
-    // Affirm that some keys are pressed/released only at 'scan_prev1' scan interval
-    // This contains a simplification (and performance optimization) that assumes no other keys
-    // are not operated at the same time. If other keys are operated, then debounce may happen.
-    if scan == *scan_prev2 && prev1_len != now_len {
-        // Back-bounce detected, do not register the most recent scan, but take the previous one
-        return scan_prev1.clone();
+    let scan0_len = scan0.as_ref().map_or(0, |vec| vec.len());
+    let scan1_len = scan1.as_ref().map_or(0, |vec| vec.len());
+
+    // Let "X" denote pressed, "O" released state, and in vector [scan3, scan2, scan1, scan0].
+
+    // Fix 1-interval case: [_, X, O, X] to [_, X, X, X] and [_, O, X, O] to [_, O, X, X] and
+    // fix 2-interval case: [X, O, O, X] to [X, O, O, O]  and [O, X, X, O] to [O, X, X, X].
+    // Note that every time former case is triggered, the latter is triggered on next round because
+    // already corrected history is fed for this function. So the minimum length of event is
+    // transformed first from 1 to 2, and on next round from 2 to 3.
+    if (&scan0 == scan2 && scan1_len != scan0_len)                        // 1-interval case
+        || (&scan0 == scan3 && scan1 == scan2 && scan1_len != scan0_len)   // 2-interval case
+    {
+        // Back-bounce detected, do not register the most recent scan, but repeat the previous one
+        return scan1.clone();
     } else {
         // No bounce detected, return the most recent scan as it is suppoded to be
-        return scan;
+        return scan0;
     }
 }
