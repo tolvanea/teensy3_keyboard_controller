@@ -23,7 +23,7 @@ ifndef MODEL
 endif
 
 TARGET=thumbv7em-none-eabi
-# Enable hard floating point with for teensy 3.5 and 3.6
+# Enable hardware floating point for teensy 3.5 and 3.6
 ifeq ($(MODEL), TEENSY35)
     TARGET=thumbv7em-none-eabihf
 endif
